@@ -24,8 +24,6 @@ namespace portscanner_backend.Controllers
                 .OrderByDescending(x => x.Sch_id)
                 .ToListAsync();
                 
-            // (Opsional) Kalau mau include nama branch, harus join manual atau pakai DTO view
-            // Tapi untuk list sederhana, data header saja cukup.
             return Ok(schedules);
         }
 
@@ -99,7 +97,6 @@ namespace portscanner_backend.Controllers
             var schedule = await _context.ScanSchedules.FindAsync(id);
             if (schedule == null) return NotFound("Jadwal tidak ditemukan");
 
-            // Ambil detail branch yang terhubung
             var targetBranches = await (from t in _context.ScanScheduleTargets
                                         join b in _context.Branches on t.Tgt_branchId equals b.Branch_id
                                         where t.Tgt_schId == id
@@ -121,20 +118,18 @@ namespace portscanner_backend.Controllers
                 Sch_targetManualPort = schedule.Sch_targetManualPort,
                 Sch_nextRun = schedule.Sch_nextRun,
                 Sch_isActive = schedule.Sch_isActive,
-                Targets = targetBranches // List Branch lengkap
+                Targets = targetBranches
             };
 
             return Ok(dto);
         }
 
-        // [BARU] UPDATE: Edit Jadwal
         [HttpPost("{id}")]
         public async Task<IActionResult> Update(int id, [FromBody] ScanSchedule req)
         {
             var schedule = await _context.ScanSchedules.FindAsync(id);
             if (schedule == null) return NotFound("Jadwal tidak ditemukan");
 
-            // 1. Update Header
             schedule.Sch_title = req.Sch_title;
             schedule.Sch_frequency = req.Sch_frequency;
             schedule.Sch_time = req.Sch_time;
@@ -142,18 +137,14 @@ namespace portscanner_backend.Controllers
             schedule.Sch_targetPortGroupId = req.Sch_targetPortGroupId;
             schedule.Sch_targetManualPort = req.Sch_targetManualPort;
 
-            // Recalculate Next Run (Optional: kalau jam diganti, hitung ulang)
             DateTime now = DateTime.UtcNow.AddHours(7);
             DateTime newRunTime = now.Date.Add(req.Sch_time);
             if (newRunTime > now) schedule.Sch_nextRun = newRunTime;
             else schedule.Sch_nextRun = newRunTime.AddDays(1);
 
-            // 2. Update Detail Branch (Hapus Lama -> Insert Baru)
-            // Hapus target lama
             var oldTargets = _context.ScanScheduleTargets.Where(t => t.Tgt_schId == id);
             _context.ScanScheduleTargets.RemoveRange(oldTargets);
 
-            // Insert target baru
             if (req.TargetBranchIds != null && req.TargetBranchIds.Any())
             {
                 var newTargets = req.TargetBranchIds.Select(bid => new ScanScheduleTarget
