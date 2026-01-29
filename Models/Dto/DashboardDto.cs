@@ -40,9 +40,9 @@ namespace portscanner_backend.Models.Dto
 
     public class PortStatusDto
     {
-        public int Port { get; set; }
+        public int? Port { get; set; }
         public string Service { get; set; } = string.Empty;
-        public bool Status { get; set; } // True = Open
+        public bool? Status { get; set; } 
         public string Severity { get; set; }
     }
 

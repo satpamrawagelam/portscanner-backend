@@ -63,26 +63,46 @@ namespace portscanner_backend.Controllers
 
             var portSeverities = await _context.PortMasters
             .ToDictionaryAsync(p => p.Pm_portNumber, p => p.Pm_severity);
+
+            using var semaphore = new SemaphoreSlim(config.MaxConcurrency); 
+            var scanTasks = new List<Task>();
             
             foreach (var ip in aliveHosts)
             {
-                var ipResult = new IpScanResultDto { Ip = ip, Ports = new List<PortScanResultDto>() };
-                
-                foreach (var port in portsToScan)
+                scanTasks.Add(Task.Run(async () => 
                 {
-                    bool isOpen = await _scanService.ScanPortAsync(ip, port, config.PortScanTimeout); 
-                    
-                    string severity = portSeverities.ContainsKey(port) ? portSeverities[port] : "Low";
+                    await semaphore.WaitAsync(); 
+                    try 
+                    {
+                        var ipResult = new IpScanResultDto { Ip = ip, Ports = new List<PortScanResultDto>() };
+                        
+                        foreach (var port in portsToScan)
+                        {
+                            bool isOpen = await _scanService.ScanPortAsync(ip, port, config.PortScanTimeout); 
+                            
+                            string severity = portSeverities.ContainsKey(port) ? portSeverities[port] : "Low";
 
-                    ipResult.Ports.Add(new PortScanResultDto 
-                    { 
-                        Port = port, 
-                        Status = isOpen,
-                        Severity = severity
-                    });
-                }
-                resultList.Add(ipResult);
+                            ipResult.Ports.Add(new PortScanResultDto 
+                            { 
+                                Port = port, 
+                                Status = isOpen,
+                                Severity = severity
+                            });
+                        }
+                        // Karena banyak thread mau nulis ke 'resultList' bersamaan, kita kunci (lock)
+                        lock (resultList)
+                        {
+                            resultList.Add(ipResult);
+                        }
+                    }
+                    finally
+                    {
+                        semaphore.Release();
+                    }
+                }));
             }
+
+            await Task.WhenAll(scanTasks);
 
             if (resultList.Any())
             {
