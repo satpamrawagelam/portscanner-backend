@@ -1,0 +1,11 @@
+{
+  "Version": 1,
+  "Hash": "fJj8ZKW/+zDCXvlA85WNekC0IGWNKMV5gCa4XLc+TGk=",
+  "Source": "portscanner-backend",
+  "BasePath": "_content/portscanner-backend",
+  "Mode": "Default",
+  "ManifestType": "Build",
+  "ReferencedProjectsConfiguration": [],
+  "DiscoveryPatterns": [],
+  "Assets": []
+}
