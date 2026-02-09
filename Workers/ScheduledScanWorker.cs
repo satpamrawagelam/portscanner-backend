@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using portscanner_backend.Data;
 using portscanner_backend.Services;
+using portscanner_backend.Models;
 using portscanner_backend.Models.Dto;
 
 namespace portscanner_backend.Workers
@@ -9,8 +10,6 @@ namespace portscanner_backend.Workers
     {
         private readonly IServiceProvider _serviceProvider;
         private readonly ILogger<ScheduledScanWorker> _logger;
-    
-        private static readonly SemaphoreSlim _globalSemaphore = new SemaphoreSlim(100);
 
         public ScheduledScanWorker(IServiceProvider serviceProvider, ILogger<ScheduledScanWorker> logger)
         {
@@ -30,7 +29,7 @@ namespace portscanner_backend.Workers
                 }
                 catch (Exception ex)
                 {
-                    _logger.LogError(ex, "Error di Worker");
+                    _logger.LogError(ex, "Error Fatal di Worker");
                 }
 
                 await Task.Delay(TimeSpan.FromMinutes(1), stoppingToken);
@@ -41,6 +40,7 @@ namespace portscanner_backend.Workers
         {
             using var scope = _serviceProvider.CreateScope();
             var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+            var scanService = scope.ServiceProvider.GetRequiredService<PortScanService>();
 
             var now = DateTime.UtcNow.AddHours(7);
 
@@ -50,51 +50,131 @@ namespace portscanner_backend.Workers
 
             if (!dueSchedules.Any()) return;
 
+            var portSeverities = await context.PortMasters
+                .ToDictionaryAsync(p => p.Pm_portNumber, p => p.Pm_severity);
+
+            var config = await context.AppConfigs.FirstOrDefaultAsync() ?? new AppConfig 
+            { 
+                MaxConcurrency = 50, PingTimeout = 1000, PortScanTimeout = 1000 
+            };
+
             foreach (var schedule in dueSchedules)
             {
-                _logger.LogInformation($"Mengeksekusi Jadwal: {schedule.Sch_title}");
+                _logger.LogInformation($"[START] Eksekusi Jadwal: {schedule.Sch_title} (ID: {schedule.Sch_id})");
 
-                var targetBranchIds = await context.ScanScheduleTargets
-                    .Where(t => t.Tgt_schId == schedule.Sch_id)
-                    .Select(t => t.Tgt_branchId)
-                    .ToListAsync();
-
-                List<int> targetPorts = new List<int>();
-
-                if (schedule.Sch_portMode == "single" && schedule.Sch_targetManualPort.HasValue)
+                try 
                 {
-                    targetPorts.Add(schedule.Sch_targetManualPort.Value);
-                }
-                else if (schedule.Sch_portMode == "group" && schedule.Sch_targetPortGroupId.HasValue)
-                {
-                    if (schedule.Sch_targetPortGroupId.Value == 0)
+                    var targetBranchIds = await context.ScanScheduleTargets
+                        .Where(t => t.Tgt_schId == schedule.Sch_id)
+                        .Select(t => t.Tgt_branchId)
+                        .ToListAsync();
+
+                    List<int> targetPorts = await ResolveTargetPorts(context, schedule);
+
+                    if (targetBranchIds.Any() && targetPorts.Any())
                     {
-                        targetPorts = await context.PortMasters
-                            .Select(pm => pm.Pm_portNumber)
-                            .Distinct()
-                            .ToListAsync();
-                    } else {
-                        targetPorts = await context.PortMasters
-                        .Where(pm => pm.Pm_portGroup == schedule.Sch_targetPortGroupId)
-                        .Select(pm => pm.Pm_portNumber)
-                        .ToListAsync();
+                        await ProcessScheduleAsync(scanService, context, schedule, targetBranchIds, targetPorts, portSeverities, config);
                     }
-                    
+                    else
+                    {
+                        _logger.LogWarning($"Jadwal {schedule.Sch_title} dilewati: Tidak ada Branch atau Port target.");
+                    }
+
+                    UpdateNextRun(schedule);
                 }
-                else if (schedule.Sch_portMode == "all")
+                catch (Exception ex)
                 {
-                    targetPorts = await context.PortMasters
-                        .Select(pm => pm.Pm_portNumber)
-                        .Distinct()
-                        .ToListAsync();
+                    _logger.LogError(ex, $"Gagal memproses jadwal {schedule.Sch_title}");
                 }
-
-                _ = ExecuteParallelScanAsync(targetBranchIds, targetPorts, schedule.Sch_title);
-
-                UpdateNextRun(schedule);
             }
 
             await context.SaveChangesAsync();
+        }
+
+        private async Task<List<int>> ResolveTargetPorts(AppDbContext context, Models.ScanSchedule schedule)
+        {
+            if (schedule.Sch_portMode == "single" && schedule.Sch_targetManualPort.HasValue)
+            {
+                return new List<int> { schedule.Sch_targetManualPort.Value };
+            }
+            
+            if (schedule.Sch_portMode == "group" && schedule.Sch_targetPortGroupId.HasValue)
+            {
+                if (schedule.Sch_targetPortGroupId.Value == 0)
+                {
+                    return await context.PortMasters.Select(pm => pm.Pm_portNumber).Distinct().ToListAsync();
+                }
+                
+                return await context.PortMasters
+                    .Where(pm => pm.Pm_portGroup == schedule.Sch_targetPortGroupId)
+                    .Select(pm => pm.Pm_portNumber)
+                    .ToListAsync();
+            }
+            
+            if (schedule.Sch_portMode == "all")
+            {
+                return await context.PortMasters.Select(pm => pm.Pm_portNumber).Distinct().ToListAsync();
+            }
+
+            return new List<int>();
+        }
+
+        private async Task ProcessScheduleAsync(
+            PortScanService scanService, 
+            AppDbContext context,
+            Models.ScanSchedule schedule, 
+            List<int> branchIds, 
+            List<int> ports,
+            Dictionary<int, string> portSeverities,
+            Models.AppConfig config)
+        {
+            var branches = await context.Branches.Where(b => branchIds.Contains(b.Branch_id)).ToListAsync();
+            var tasks = new List<Task>();
+
+            foreach (var branch in branches)
+            {
+                tasks.Add(Task.Run(async () => 
+                {
+                    try 
+                    {
+                        var scanResults = await scanService.ExecuteSubnetScanAsync(
+                            branch.Branch_cidr,
+                            ports,
+                            config.MaxConcurrency,
+                            config.PingTimeout,
+                            config.PortScanTimeout
+                        );
+
+                        foreach (var host in scanResults)
+                        {
+                            foreach (var portResult in host.Ports)
+                            {
+                                portResult.Severity = portSeverities.ContainsKey(portResult.Port) 
+                                    ? portSeverities[portResult.Port] 
+                                    : "Medium";
+                            }
+                        }
+
+                        if (scanResults.Any())
+                        {
+                            await scanService.BulkSaveResultsAsync(
+                                branch.Branch_id, 
+                                scanResults, 
+                                schedule.Sch_title, 
+                                "Scheduled Scan", 
+                                schedule.Sch_id
+                            ); 
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, $"Gagal scan branch {branch.Branch_name} pada jadwal {schedule.Sch_title}");
+                    }
+                }));
+            }
+
+            await Task.WhenAll(tasks);
+            _logger.LogInformation($"[DONE] Jadwal '{schedule.Sch_title}' selesai.");
         }
 
         private void UpdateNextRun(Models.ScanSchedule schedule)
@@ -109,83 +189,6 @@ namespace portscanner_backend.Workers
                 schedule.Sch_nextRun = schedule.Sch_nextRun?.AddDays(7);
             else if (schedule.Sch_frequency == "Once")
                 schedule.Sch_isActive = false;
-        }
-
-        private async Task ExecuteParallelScanAsync(List<int> branchIds, List<int> ports, string title)
-        {
-            try 
-            {
-                using var scope = _serviceProvider.CreateScope();
-                var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-                var scanService = scope.ServiceProvider.GetRequiredService<PortScanService>();
-                
-                var branches = await context.Branches.Where(b => branchIds.Contains(b.Branch_id)).ToListAsync();
-                var branchTasks = new List<Task>();
-
-                foreach (var branch in branches)
-                {
-                    branchTasks.Add(ProcessSingleBranchAsync(scanService, branch, ports, title));
-                }
-
-                await Task.WhenAll(branchTasks);
-                _logger.LogInformation($"Jadwal '{title}' Selesai Sepenuhnya.");
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, $"Error saat eksekusi background scan '{title}'");
-            }
-        }
-
-        private async Task ProcessSingleBranchAsync(PortScanService scanService, Models.Branch branch, List<int> ports, string title)
-        {
-            var allIps = scanService.ExpandCidr(branch.Branch_cidr);
-            
-            var aliveHosts = await scanService.GetAliveHostsAsync(allIps, 100, 3000, 3);
-
-            if (!aliveHosts.Any()) return;
-
-            var hostTasks = new List<Task>();
-            var results = new List<IpScanResultDto>();
-
-            foreach (var ip in aliveHosts)
-            {
-                hostTasks.Add(Task.Run(async () =>
-                {
-                    await _globalSemaphore.WaitAsync();
-                    try
-                    {
-                        var portResults = new List<PortScanResultDto>();
-                        
-                        foreach (var port in ports)
-                        {
-                            bool isOpen = await scanService.ScanPortAsync(ip, port, 1000);
-                            
-                            portResults.Add(new PortScanResultDto 
-                            { 
-                                Port = port, 
-                                Status = isOpen,
-                                Severity = "Low"
-                            });
-                        }
-
-                        lock (results)
-                        {
-                            results.Add(new IpScanResultDto { Ip = ip, Ports = portResults });
-                        }
-                    }
-                    finally
-                    {
-                        _globalSemaphore.Release();
-                    }
-                }));
-            }
-
-            await Task.WhenAll(hostTasks);
-
-            if (results.Any())
-            {
-                await scanService.BulkSaveResultsAsync(branch.Branch_id, results, title, "Scheduled Scan");
-            }
         }
     }
 }

@@ -13,6 +13,8 @@ namespace portscanner_backend.Models.Dto
     public class IpScanResultDto
     {
         public string Ip { get; set; } = string.Empty;
+
+        public bool IsHostAlive { get; set; }
         
         public List<PortScanResultDto> Ports { get; set; } = new List<PortScanResultDto>();
     }
@@ -21,7 +23,7 @@ namespace portscanner_backend.Models.Dto
     {
         public int Port { get; set; }
         public bool Status { get; set; }
-        public string Severity { get; set; } = "Low";
+        public string Severity { get; set; }
     }
 
     public class ScanHistoryDto
@@ -37,18 +39,16 @@ namespace portscanner_backend.Models.Dto
     // Scheduled
     public class ScheduleDetailDto
     {
-        // Info Header Jadwal
         public int Sch_id { get; set; }
         public string Sch_title { get; set; }
         public string Sch_frequency { get; set; }
-        public string Sch_time { get; set; } // string biar gampang (HH:mm:ss)
+        public string Sch_time { get; set; }
         public string Sch_portMode { get; set; }
         public int? Sch_targetPortGroupId { get; set; }
         public int? Sch_targetManualPort { get; set; }
         public DateTime? Sch_nextRun { get; set; }
         public bool Sch_isActive { get; set; }
 
-        // Info Detail Branch
         public List<TargetBranchDto> Targets { get; set; } = new List<TargetBranchDto>();
     }
 

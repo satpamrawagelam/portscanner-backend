@@ -7,6 +7,7 @@ using Microsoft.Data.SqlClient;
 using portscanner_backend.Data;
 using portscanner_backend.Models;
 using portscanner_backend.Models.Dto;
+using System.Collections.Concurrent;
 
 namespace portscanner_backend.Services
 {
@@ -25,17 +26,13 @@ namespace portscanner_backend.Services
             var baseIp = IPAddress.Parse(parts[0]);
             int prefix = int.Parse(parts[1]);
 
-            if (prefix == 32)
-            {
-                return new List<string> { baseIp.ToString() };
-            }
+            if (prefix == 32) return new List<string> { baseIp.ToString() };
 
             uint ip = BitConverter.ToUInt32(baseIp.GetAddressBytes().Reverse().ToArray(), 0);
             int hostBits = 32 - prefix;
             uint numberOfHosts = (uint)Math.Pow(2, hostBits);
 
             var ips = new List<string>();
-
             uint start = (prefix < 31) ? 1u : 0u; 
             uint end = (prefix < 31) ? numberOfHosts - 1 : numberOfHosts;
 
@@ -45,14 +42,16 @@ namespace portscanner_backend.Services
                 var bytes = BitConverter.GetBytes(newIp).Reverse().ToArray();
                 ips.Add(new IPAddress(bytes).ToString());
             }
-
             return ips;
         }
 
-        public async Task<List<string>> GetAliveHostsAsync(List<string> ips, int maxConcurrency, int pingTimeout, int pingRetries)
+        public async Task<ConcurrentDictionary<string, bool>> CheckHostsAvailabilityAsync(List<string> ips, int maxConcurrency, int pingTimeout, int pingRetries)
         {
-            var aliveHosts = new List<string>();
-            var semaphore = new SemaphoreSlim(maxConcurrency); 
+            var hostStatuses = new ConcurrentDictionary<string, bool>();
+            
+            foreach (var ip in ips) hostStatuses.TryAdd(ip, false);
+
+            var semaphore = new SemaphoreSlim(maxConcurrency);
 
             var tasks = ips.Select(async ip =>
             {
@@ -60,38 +59,21 @@ namespace portscanner_backend.Services
                 try
                 {
                     using var ping = new Ping();
-                    bool isAlive = false;
-
                     for (int i = 0; i < pingRetries; i++)
                     {
                         try
                         {
-                            var reply = await ping.SendPingAsync(ip, pingTimeout); 
-                    
+                            var reply = await ping.SendPingAsync(ip, pingTimeout);
                             if (reply.Status == IPStatus.Success)
                             {
-                                lock (aliveHosts)
-                                {
-                                    isAlive = true;
-                                    break;
-                                }
+                                hostStatuses[ip] = true;
+                                break;
                             }
                         }
-                        catch
-                        {
-                            
-                        }
-                        
-                    }
-                    if (isAlive)
-                    {
-                        lock (aliveHosts)
-                        {
-                            aliveHosts.Add(ip);
-                        }
+                        catch { }
+                        await Task.Delay(50);
                     }
                 }
-                catch { }
                 finally
                 {
                     semaphore.Release();
@@ -99,7 +81,7 @@ namespace portscanner_backend.Services
             });
 
             await Task.WhenAll(tasks);
-            return aliveHosts;
+            return hostStatuses;
         }
 
         public async Task<bool> ScanPortAsync(string ip, int port, int timeoutMs)
@@ -108,26 +90,73 @@ namespace portscanner_backend.Services
             {
                 using var client = new TcpClient();
                 var connectTask = client.ConnectAsync(ip, port);
-                var delayTask = Task.Delay(timeoutMs); 
+                var delayTask = Task.Delay(timeoutMs);
 
                 var completed = await Task.WhenAny(connectTask, delayTask);
-                if (completed != connectTask) 
-                {
-                    return false;
-                }
-                
-                await connectTask; 
+                if (completed != connectTask) return false;
+
+                await connectTask;
                 return client.Connected;
             }
-            catch
-            {
-                return false;
-            }
+            catch { return false; }
         }
 
-        
+        public async Task<List<IpScanResultDto>> ExecuteSubnetScanAsync(
+            string cidr, 
+            List<int> targetPorts, 
+            int concurrency = 50, 
+            int pingTimeout = 1000, 
+            int portTimeout = 1000)
+        {
+            var ips = ExpandCidr(cidr);
 
-        public async Task BulkSaveResultsAsync(int branchId, List<IpScanResultDto> results, string scanTitle, string scanType)
+            var hostStatusDict = await CheckHostsAvailabilityAsync(ips, concurrency, pingTimeout, 2);
+
+            var results = new ConcurrentBag<IpScanResultDto>();
+            var semaphore = new SemaphoreSlim(concurrency);
+
+            var scanTasks = ips.Select(async ip => 
+            {
+                await semaphore.WaitAsync();
+                try 
+                {
+                    bool isPingAlive = hostStatusDict.ContainsKey(ip) && hostStatusDict[ip];
+
+                    var ipResult = new IpScanResultDto
+                    {
+                        Ip = ip,
+                        IsHostAlive = isPingAlive,
+                        Ports = new List<PortScanResultDto>()
+                    };
+
+                    foreach (var port in targetPorts)
+                    {
+                        bool isOpen = await ScanPortAsync(ip, port, portTimeout);
+                        
+                        ipResult.Ports.Add(new PortScanResultDto 
+                        { 
+                            Port = port, 
+                            Status = isOpen,
+                            Severity = "Info"
+                        });
+                    }
+
+                    results.Add(ipResult);
+                }
+                finally 
+                {
+                    semaphore.Release();
+                }
+            });
+
+            await Task.WhenAll(scanTasks);
+
+            return results
+                .OrderBy(r => Version.TryParse(r.Ip, out var v) ? v.ToString() : r.Ip)
+                .ToList();
+        }
+
+        public async Task BulkSaveResultsAsync(int branchId, List<IpScanResultDto> results, string scanTitle, string scanType, int? schId = null)
         {
             var table = new DataTable();
             table.Columns.Add("BranchId", typeof(int));
@@ -137,36 +166,39 @@ namespace portscanner_backend.Services
             table.Columns.Add("ScanDate", typeof(DateTime));
             table.Columns.Add("Res_title", typeof(string));
             table.Columns.Add("Res_type", typeof(string));
+            table.Columns.Add("HostStatus", typeof(bool));
 
             var scanDateTemp = DateTime.UtcNow.AddHours(7);
-            
+
             foreach (var ipResult in results)
             {
-                if (ipResult.Ports != null) 
+                if (ipResult.Ports != null && ipResult.Ports.Any())
                 {
-                    
                     foreach (var portResult in ipResult.Ports)
                     {
                         table.Rows.Add(
-                            branchId, 
-                            ipResult.Ip, 
-                            portResult.Port, 
-                            portResult.Status, 
+                            branchId,
+                            ipResult.Ip,
+                            portResult.Port,
+                            portResult.Status,
                             scanDateTemp,
                             scanTitle,
-                            scanType
+                            scanType,
+                            ipResult.IsHostAlive
                         );
                     }
                 }
             }
 
-            var parameter = new SqlParameter("@ScanData", SqlDbType.Structured)
+            var pScanData = new SqlParameter("@ScanData", SqlDbType.Structured)
             {
                 TypeName = "dbo.ScanResultType",
                 Value = table
             };
 
-            await _context.Database.ExecuteSqlRawAsync("EXEC sp_BulkSaveScanResults @ScanData", parameter);
+            var pSchId = new SqlParameter("@SchId", schId.HasValue ? (object)schId.Value : DBNull.Value);
+
+            await _context.Database.ExecuteSqlRawAsync("EXEC sp_BulkSaveScanResults @ScanData, @SchId", pScanData, pSchId);
         }
     }
 }

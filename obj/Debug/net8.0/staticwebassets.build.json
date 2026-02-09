@@ -1,11 +1,12 @@
 {
   "Version": 1,
-  "Hash": "fJj8ZKW/+zDCXvlA85WNekC0IGWNKMV5gCa4XLc+TGk=",
+  "Hash": "YJ5mkCDEWJCTw90abRqkkjJho/B+pJ1appDMyTVjC8I=",
   "Source": "portscanner-backend",
   "BasePath": "_content/portscanner-backend",
   "Mode": "Default",
   "ManifestType": "Build",
   "ReferencedProjectsConfiguration": [],
   "DiscoveryPatterns": [],
-  "Assets": []
+  "Assets": [],
+  "Endpoints": []
 }

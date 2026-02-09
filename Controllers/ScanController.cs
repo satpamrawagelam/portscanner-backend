@@ -24,34 +24,34 @@ namespace portscanner_backend.Controllers
         public async Task<IActionResult> Scan([FromBody] ScanRequestDto req)
         {
             if (string.IsNullOrWhiteSpace(req.Title)) 
-            return BadRequest("Judul Scan wajib diisi.");
+                return BadRequest("Judul Scan wajib diisi.");
 
             var branch = await _context.Branches.FirstOrDefaultAsync(b => b.Branch_id == req.Branch_id);
             if (branch == null) return BadRequest("Branch not found");
 
-            var config = await _context.AppConfigs.FirstOrDefaultAsync() ?? new AppConfig();
-
-            var ipList = _scanService.ExpandCidr(branch.Branch_cidr);
-        
-            var aliveHosts = await _scanService.GetAliveHostsAsync(
-                ipList, 
-                config.MaxConcurrency, 
-                config.PingTimeout, 
-                config.PingRetries 
-            );
+            var config = await _context.AppConfigs.FirstOrDefaultAsync() ?? new AppConfig 
+            { 
+                MaxConcurrency = 50, PingTimeout = 1000, PortScanTimeout = 1000 
+            };
 
             List<int> portsToScan = new();
+            
             if (req.Manual_port.HasValue) 
             {
                 portsToScan.Add(req.Manual_port.Value);
-            } else if (req.Pg_id.HasValue)
+            } 
+            else if (req.Pg_id.HasValue)
             {
                 if (req.Pg_id == 0)
                 {
-                    portsToScan = await _context.PortMasters.Select(p => p.Pm_portNumber).Distinct().ToListAsync();
-                } else
+                    portsToScan = await _context.PortMasters
+                        .Select(p => p.Pm_portNumber).Distinct().ToListAsync();
+                } 
+                else 
                 {
-                    portsToScan = await _context.PortMasters.Where(p => p.Pm_portGroup == req.Pg_id).Select(p => p.Pm_portNumber).ToListAsync();
+                    portsToScan = await _context.PortMasters
+                        .Where(p => p.Pm_portGroup == req.Pg_id)
+                        .Select(p => p.Pm_portNumber).ToListAsync();
                 }
             }
             else
@@ -59,67 +59,54 @@ namespace portscanner_backend.Controllers
                 return BadRequest("PortGroup or Manual port required");
             }
 
-            var resultList = new List<IpScanResultDto>();
+            if (!portsToScan.Any()) return BadRequest("Tidak ada port yang ditemukan untuk discan.");
+
+            var scanResults = await _scanService.ExecuteSubnetScanAsync(
+                branch.Branch_cidr,
+                portsToScan,
+                config.MaxConcurrency,
+                config.PingTimeout,
+                config.PortScanTimeout
+            );
 
             var portSeverities = await _context.PortMasters
-            .ToDictionaryAsync(p => p.Pm_portNumber, p => p.Pm_severity);
+                .ToDictionaryAsync(p => p.Pm_portNumber, p => p.Pm_severity);
 
-            using var semaphore = new SemaphoreSlim(config.MaxConcurrency); 
-            var scanTasks = new List<Task>();
-            
-            foreach (var ip in aliveHosts)
+            foreach (var host in scanResults)
             {
-                scanTasks.Add(Task.Run(async () => 
+                foreach (var port in host.Ports)
                 {
-                    await semaphore.WaitAsync(); 
-                    try 
-                    {
-                        var ipResult = new IpScanResultDto { Ip = ip, Ports = new List<PortScanResultDto>() };
-                        
-                        foreach (var port in portsToScan)
-                        {
-                            bool isOpen = await _scanService.ScanPortAsync(ip, port, config.PortScanTimeout); 
-                            
-                            string severity = portSeverities.ContainsKey(port) ? portSeverities[port] : "Low";
-
-                            ipResult.Ports.Add(new PortScanResultDto 
-                            { 
-                                Port = port, 
-                                Status = isOpen,
-                                Severity = severity
-                            });
-                        }
-                        // Karena banyak thread mau nulis ke 'resultList' bersamaan, kita kunci (lock)
-                        lock (resultList)
-                        {
-                            resultList.Add(ipResult);
-                        }
-                    }
-                    finally
-                    {
-                        semaphore.Release();
-                    }
-                }));
+                    port.Severity = portSeverities.ContainsKey(port.Port) 
+                        ? portSeverities[port.Port] 
+                        : "Info";
+                }
             }
 
-            await Task.WhenAll(scanTasks);
-
-            if (resultList.Any())
+            if (scanResults.Any())
             {
-                await _scanService.BulkSaveResultsAsync(branch.Branch_id, resultList, req.Title, "Manual Scan");
+                await _scanService.BulkSaveResultsAsync(
+                    branch.Branch_id, 
+                    scanResults, 
+                    req.Title, 
+                    "Manual Scan", 
+                    null
+                );
             }
 
             return Ok(new
             {
                 branchId = branch.Branch_id,
+                branchName = branch.Branch_name,
+                branchCidr = branch.Branch_cidr,
                 summary = new 
                 { 
-                    totalHosts = aliveHosts.Count, 
-                    totalScanned = resultList.Count,
+                    totalHosts = scanResults.Count, 
+                    aliveHosts = scanResults.Count(r => r.IsHostAlive),
+                    deadHosts = scanResults.Count(r => !r.IsHostAlive),
+                    totalOpenPorts = scanResults.Sum(r => r.Ports.Count(p => p.Status))
                 },
-                results = resultList
+                results = scanResults 
             });
         }
     }
-
 }

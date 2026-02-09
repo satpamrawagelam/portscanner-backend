@@ -51,9 +51,12 @@ namespace portscanner_backend.Services
 
             foreach (var grp in grouped)
             {
+                var firtsRow = grp.First();
+
                 var ipDto = new IpPortStatusDto
                 {
                     Ip = grp.Key,
+                    HostStatus = firtsRow.HostStatus,
                     Ports = grp.Select(x => new PortStatusDto
                     {
                         Port = x.PortNumber,

@@ -24,6 +24,9 @@ namespace portscanner_backend.Controllers
                 .OrderByDescending(x => x.Sch_id)
                 .ToListAsync();
                 
+                
+                Console.WriteLine(schedules);
+
             return Ok(schedules);
         }
 
@@ -34,7 +37,7 @@ namespace portscanner_backend.Controllers
             {
                 // 1. Hitung Kapan Next Run Pertamanya (WIB)
                 DateTime now = DateTime.UtcNow.AddHours(7); 
-                DateTime todayRun = now.Date.Add(req.Sch_time); // Hari ini + Jam Jadwal
+                DateTime todayRun = now.Date.Add(req.Sch_time);
 
                 if (todayRun > now)
                     req.Sch_nextRun = todayRun;

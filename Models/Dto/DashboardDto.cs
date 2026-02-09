@@ -23,7 +23,6 @@ namespace portscanner_backend.Models.Dto
 
 
 
-    // Detail Branch
     public class BranchDetailDto
     {
         public string BranchName { get; set; } = string.Empty;
@@ -35,6 +34,7 @@ namespace portscanner_backend.Models.Dto
     public class IpPortStatusDto
     {
         public string Ip { get; set; } = string.Empty;
+        public bool HostStatus { get; set; }
         public List<PortStatusDto> Ports { get; set; } = new List<PortStatusDto>();
     }
 
@@ -56,6 +56,7 @@ namespace portscanner_backend.Models.Dto
         public string ServiceName { get; set; }
         public bool IsOpen { get; set; }
         public string Severity { get; set; }
+        public bool HostStatus { get; set; }
     }
 
     
@@ -69,11 +70,10 @@ namespace portscanner_backend.Models.Dto
         public int LowRisk { get; set; }
     }
 
-    // Pastikan DTO-nya support nullable int untuk TotalOpenPorts
     public class GlobalTrendDto
     {
         public DateTime ScanDate { get; set; }
-        public int? TotalOpenPorts { get; set; } // Ubah jadi int? (nullable)
+        public int? TotalOpenPorts { get; set; } 
     }
 
 
