@@ -33,7 +33,8 @@ namespace portscanner_backend.Models.Dto
         public string ScanType { get; set; }
         public string BranchName { get; set; }
         public string IpAddress { get; set; }
-        public string OpenPorts { get; set; } // Ini nanti isinya "80, 443"
+        public string OpenPorts { get; set; }
+        public bool HostStatus { get; set; }
     }
 
     // Scheduled
