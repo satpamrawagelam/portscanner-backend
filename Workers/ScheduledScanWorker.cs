@@ -40,7 +40,6 @@ namespace portscanner_backend.Workers
         {
             using var scope = _serviceProvider.CreateScope();
             var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-            var scanService = scope.ServiceProvider.GetRequiredService<PortScanService>();
 
             var now = DateTime.UtcNow.AddHours(7);
 
@@ -53,16 +52,18 @@ namespace portscanner_backend.Workers
             var portSeverities = await context.PortMasters
                 .ToDictionaryAsync(p => p.Pm_portNumber, p => p.Pm_severity);
 
-            var config = await context.AppConfigs.FirstOrDefaultAsync() ?? new AppConfig 
-            { 
-                MaxConcurrency = 50, PingTimeout = 1000, PortScanTimeout = 1000 
+            var config = await context.AppConfigs.FirstOrDefaultAsync() ?? new AppConfig
+            {
+                MaxConcurrency = 50,
+                PingTimeout = 1000,
+                PortScanTimeout = 1000
             };
 
             foreach (var schedule in dueSchedules)
             {
                 _logger.LogInformation($"[START] Eksekusi Jadwal: {schedule.Sch_title} (ID: {schedule.Sch_id})");
 
-                try 
+                try
                 {
                     var targetBranchIds = await context.ScanScheduleTargets
                         .Where(t => t.Tgt_schId == schedule.Sch_id)
@@ -73,7 +74,7 @@ namespace portscanner_backend.Workers
 
                     if (targetBranchIds.Any() && targetPorts.Any())
                     {
-                        await ProcessScheduleAsync(scanService, context, schedule, targetBranchIds, targetPorts, portSeverities, config);
+                        await ProcessScheduleParallelAsync(schedule, targetBranchIds, targetPorts, portSeverities, config);
                     }
                     else
                     {
@@ -87,7 +88,6 @@ namespace portscanner_backend.Workers
                     _logger.LogError(ex, $"Gagal memproses jadwal {schedule.Sch_title}");
                 }
             }
-
             await context.SaveChangesAsync();
         }
 
@@ -97,20 +97,20 @@ namespace portscanner_backend.Workers
             {
                 return new List<int> { schedule.Sch_targetManualPort.Value };
             }
-            
+
             if (schedule.Sch_portMode == "group" && schedule.Sch_targetPortGroupId.HasValue)
             {
                 if (schedule.Sch_targetPortGroupId.Value == 0)
                 {
                     return await context.PortMasters.Select(pm => pm.Pm_portNumber).Distinct().ToListAsync();
                 }
-                
+
                 return await context.PortMasters
                     .Where(pm => pm.Pm_portGroup == schedule.Sch_targetPortGroupId)
                     .Select(pm => pm.Pm_portNumber)
                     .ToListAsync();
             }
-            
+
             if (schedule.Sch_portMode == "all")
             {
                 return await context.PortMasters.Select(pm => pm.Pm_portNumber).Distinct().ToListAsync();
@@ -119,62 +119,85 @@ namespace portscanner_backend.Workers
             return new List<int>();
         }
 
-        private async Task ProcessScheduleAsync(
-            PortScanService scanService, 
-            AppDbContext context,
-            Models.ScanSchedule schedule, 
-            List<int> branchIds, 
+        private async Task ProcessScheduleParallelAsync(
+            Models.ScanSchedule schedule,
+            List<int> branchIds,
             List<int> ports,
             Dictionary<int, string> portSeverities,
             Models.AppConfig config)
         {
-            var branches = await context.Branches.Where(b => branchIds.Contains(b.Branch_id)).ToListAsync();
+            // Ambil data detail branch dulu (bisa pakai context luar karena cuma baca)
+            // Atau lebih aman ambil di dalam scope masing-masing jika mau benar-benar terisolasi.
+            // Disini kita ambil list CIDR-nya dulu biar tidak passing DbContext ke Task.
+            
+            // Kita butuh CIDR dan ID, jadi kita query dulu sebentar pakai Scope temporary atau context yang dipassing (aman karena await sequential)
+            List<Models.Branch> branches;
+            using (var scope = _serviceProvider.CreateScope())
+            {
+                var tmpContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+                branches = await tmpContext.Branches
+                    .Where(b => branchIds.Contains(b.Branch_id))
+                    .AsNoTracking() // Penting: AsNoTracking biar enteng
+                    .ToListAsync();
+            }
+
             var tasks = new List<Task>();
 
             foreach (var branch in branches)
             {
-                tasks.Add(Task.Run(async () => 
+                var currentBranch = branch;
+
+                tasks.Add(Task.Run(async () =>
                 {
-                    try 
+                    using (var scope = _serviceProvider.CreateScope())
                     {
-                        var scanResults = await scanService.ExecuteSubnetScanAsync(
-                            branch.Branch_cidr,
-                            ports,
-                            config.MaxConcurrency,
-                            config.PingTimeout,
-                            config.PortScanTimeout
-                        );
-
-                        foreach (var host in scanResults)
+                        var scopedScanService = scope.ServiceProvider.GetRequiredService<PortScanService>();
+                        
+                        try
                         {
-                            foreach (var portResult in host.Ports)
+                            _logger.LogInformation($"Scanning Branch {currentBranch.Branch_name}...");
+
+                            var scanResults = await scopedScanService.ExecuteSubnetScanAsync(
+                                currentBranch.Branch_cidr,
+                                ports,
+                                config.MaxConcurrency,
+                                config.PingTimeout,
+                                config.PortScanTimeout
+                            );
+
+                            foreach (var host in scanResults)
                             {
-                                portResult.Severity = portSeverities.ContainsKey(portResult.Port) 
-                                    ? portSeverities[portResult.Port] 
-                                    : "Medium";
+                                foreach (var portResult in host.Ports)
+                                {
+                                    portResult.Severity = portSeverities.ContainsKey(portResult.Port)
+                                        ? portSeverities[portResult.Port]
+                                        : "Medium";
+                                }
                             }
-                        }
 
-                        if (scanResults.Any())
-                        {
-                            await scanService.BulkSaveResultsAsync(
-                                branch.Branch_id, 
-                                scanResults, 
-                                schedule.Sch_title, 
-                                "Scheduled Scan", 
-                                schedule.Sch_id
-                            ); 
+                            if (scanResults.Any())
+                            {
+                                await scopedScanService.BulkSaveResultsAsync(
+                                    currentBranch.Branch_id,
+                                    scanResults,
+                                    schedule.Sch_title,
+                                    "Scheduled Scan",
+                                    schedule.Sch_id
+                                );
+                            }
+                            
+                            _logger.LogInformation($"Selesai Branch {currentBranch.Branch_name}.");
                         }
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogError(ex, $"Gagal scan branch {branch.Branch_name} pada jadwal {schedule.Sch_title}");
+                        catch (Exception ex)
+                        {
+                            _logger.LogError(ex, $"Gagal scan branch {currentBranch.Branch_name} pada jadwal {schedule.Sch_title}");
+                        }
                     }
                 }));
             }
 
             await Task.WhenAll(tasks);
-            _logger.LogInformation($"[DONE] Jadwal '{schedule.Sch_title}' selesai.");
+            _logger.LogInformation($"[DONE] Semua task branch untuk jadwal '{schedule.Sch_title}' selesai.");
         }
 
         private void UpdateNextRun(Models.ScanSchedule schedule)
