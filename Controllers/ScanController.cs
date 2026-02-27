@@ -36,9 +36,9 @@ namespace portscanner_backend.Controllers
 
             List<int> portsToScan = new();
             
-            if (req.Manual_port.HasValue) 
+            if (req.Manual_ports != null && req.Manual_ports.Any()) 
             {
-                portsToScan.Add(req.Manual_port.Value);
+                portsToScan.AddRange(req.Manual_ports);
             } 
             else if (req.Pg_id.HasValue)
             {
@@ -51,7 +51,7 @@ namespace portscanner_backend.Controllers
                 {
                     portsToScan = await _context.PortMasters
                         .Where(p => p.Pm_portGroup == req.Pg_id)
-                        .Select(p => p.Pm_portNumber).ToListAsync();
+                        .Select(p => p.Pm_portNumber).Distinct().ToListAsync();
                 }
             }
             else
@@ -70,7 +70,8 @@ namespace portscanner_backend.Controllers
             );
 
             var portSeverities = await _context.PortMasters
-                .ToDictionaryAsync(p => p.Pm_portNumber, p => p.Pm_severity);
+                .GroupBy(p => p.Pm_portNumber)
+                .ToDictionaryAsync(g => g.Key, g => g.First().Pm_severity);
 
             foreach (var host in scanResults)
             {

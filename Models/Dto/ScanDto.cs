@@ -6,7 +6,7 @@ namespace portscanner_backend.Models.Dto
 
         public int? Pg_id { get; set; }
 
-        public int? Manual_port { get; set; }
+        public List<int>? Manual_ports { get; set; }
         public string Title { get; set; }
     }
 
@@ -35,9 +35,20 @@ namespace portscanner_backend.Models.Dto
         public string IpAddress { get; set; }
         public string OpenPorts { get; set; }
         public bool HostStatus { get; set; }
+        public int TotalRecords { get; set; }
     }
 
-    // Scheduled
+    public class ScheduleRequestDto
+    {
+        public string Sch_title { get; set; }
+        public string Sch_frequency { get; set; }
+        public string Sch_time { get; set; } // Dari React String
+        public string Sch_portMode { get; set; }
+        public int? Sch_targetPortGroupId { get; set; }
+        public List<int>? Sch_targetManualPorts { get; set; } 
+        public List<int>? TargetBranchIds { get; set; }
+    }
+
     public class ScheduleDetailDto
     {
         public int Sch_id { get; set; }
@@ -46,7 +57,7 @@ namespace portscanner_backend.Models.Dto
         public string Sch_time { get; set; }
         public string Sch_portMode { get; set; }
         public int? Sch_targetPortGroupId { get; set; }
-        public int? Sch_targetManualPort { get; set; }
+        public List<int>? Sch_targetManualPorts { get; set; } // PERBAIKAN: ditambah 's'
         public DateTime? Sch_nextRun { get; set; }
         public bool Sch_isActive { get; set; }
 

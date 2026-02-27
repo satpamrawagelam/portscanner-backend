@@ -93,9 +93,14 @@ namespace portscanner_backend.Workers
 
         private async Task<List<int>> ResolveTargetPorts(AppDbContext context, Models.ScanSchedule schedule)
         {
-            if (schedule.Sch_portMode == "single" && schedule.Sch_targetManualPort.HasValue)
+            if (schedule.Sch_portMode == "single" && !string.IsNullOrEmpty(schedule.Sch_targetManualPorts))
             {
-                return new List<int> { schedule.Sch_targetManualPort.Value };
+                return schedule.Sch_targetManualPorts
+                    .Split(',')
+                    .Select(p => int.TryParse(p, out int val) ? val : (int?)null)
+                    .Where(val => val.HasValue)
+                    .Select(val => val.Value)
+                    .ToList();
             }
 
             if (schedule.Sch_portMode == "group" && schedule.Sch_targetPortGroupId.HasValue)
@@ -108,6 +113,7 @@ namespace portscanner_backend.Workers
                 return await context.PortMasters
                     .Where(pm => pm.Pm_portGroup == schedule.Sch_targetPortGroupId)
                     .Select(pm => pm.Pm_portNumber)
+                    .Distinct() // Jaga-jaga kalau ada duplikat di master
                     .ToListAsync();
             }
 

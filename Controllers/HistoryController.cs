@@ -17,13 +17,40 @@ namespace portscanner_backend.Controllers
         }
 
         [HttpGet]
-        public async Task<IActionResult> GetHistory()
+        public async Task<IActionResult> GetHistory(
+            [FromQuery] string scanType = "manual", 
+            [FromQuery] int page = 1, 
+            [FromQuery] int pageSize = 10,
+            [FromQuery] string? search = "")
         {
-            var history = await _context.ScanHistoryLogs
-                .FromSqlRaw("EXEC sp_GetScanHistoryLog")
-                .ToListAsync();
+            try
+            {
+                var pScanType = new Microsoft.Data.SqlClient.SqlParameter("@ScanType", scanType);
+                var pSearch = new Microsoft.Data.SqlClient.SqlParameter("@SearchTerm", search ?? "");
+                var pPage = new Microsoft.Data.SqlClient.SqlParameter("@PageNumber", page);
+                var pSize = new Microsoft.Data.SqlClient.SqlParameter("@PageSize", pageSize);
 
-            return Ok(history);
+                var rawData = await _context.Set<ScanHistoryDto>()
+                    .FromSqlRaw("EXEC sp_GetScanHistoryLog @ScanType, @SearchTerm, @PageNumber, @PageSize", 
+                        pScanType, pSearch, pPage, pSize)
+                    .ToListAsync();
+
+                int totalRecords = rawData.FirstOrDefault()?.TotalRecords ?? 0;
+                int totalPages = (int)Math.Ceiling(totalRecords / (double)pageSize);
+
+                return Ok(new 
+                {
+                    TotalRecords = totalRecords,
+                    CurrentPage = page,
+                    PageSize = pageSize,
+                    TotalPages = totalPages,
+                    Data = rawData
+                });
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, new { message = ex.Message });
+            }
         }
     }
 }

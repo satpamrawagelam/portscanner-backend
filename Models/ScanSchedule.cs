@@ -13,7 +13,7 @@ namespace portscanner_backend.Models
         public string? Sch_days { get; set; }
         public string Sch_portMode { get; set; } = "group";
         public int? Sch_targetPortGroupId { get; set; }
-        public int? Sch_targetManualPort { get; set; }
+        public string? Sch_targetManualPorts { get; set; }
         public DateTime? Sch_lastRun { get; set; }
         public DateTime? Sch_nextRun { get; set; }
         public bool Sch_isActive { get; set; } = true;
@@ -22,6 +22,5 @@ namespace portscanner_backend.Models
         [NotMapped]
         public List<int> TargetBranchIds { get; set; } = new List<int>();
     }
-
     
 }

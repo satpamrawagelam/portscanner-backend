@@ -24,38 +24,48 @@ namespace portscanner_backend.Controllers
                 .OrderByDescending(x => x.Sch_id)
                 .ToListAsync();
                 
-                
-                Console.WriteLine(schedules);
-
             return Ok(schedules);
         }
 
         [HttpPost]
-        public async Task<IActionResult> Create([FromBody] ScanSchedule req)
+        public async Task<IActionResult> Create([FromBody] ScheduleRequestDto req)
         {
             try
             {
-                // 1. Hitung Kapan Next Run Pertamanya (WIB)
                 DateTime now = DateTime.UtcNow.AddHours(7); 
-                DateTime todayRun = now.Date.Add(req.Sch_time);
+                
+                // PERBAIKAN: Parse string time ke TimeSpan
+                TimeSpan parsedTime;
+                if (!TimeSpan.TryParse(req.Sch_time, out parsedTime))
+                {
+                    return BadRequest(new { message = "Format waktu tidak valid. Gunakan HH:mm:ss" });
+                }
 
-                if (todayRun > now)
-                    req.Sch_nextRun = todayRun;
-                else
-                    req.Sch_nextRun = todayRun.AddDays(1);
+                DateTime todayRun = now.Date.Add(parsedTime);
 
-                req.Sch_createdDate = now;
-                req.Sch_lastRun = null;
-                req.Sch_isActive = true;
+                var newSchedule = new ScanSchedule
+                {
+                    Sch_title = req.Sch_title,
+                    Sch_frequency = req.Sch_frequency,
+                    Sch_time = parsedTime, // Simpan sbg TimeSpan di Database
+                    Sch_portMode = req.Sch_portMode,
+                    Sch_targetPortGroupId = req.Sch_targetPortGroupId,
+                    Sch_targetManualPorts = req.Sch_targetManualPorts != null && req.Sch_targetManualPorts.Any() 
+                        ? string.Join(",", req.Sch_targetManualPorts) 
+                        : null,
+                    Sch_createdDate = now,
+                    Sch_isActive = true,
+                    Sch_nextRun = todayRun > now ? todayRun : todayRun.AddDays(1)
+                };
 
-                _context.ScanSchedules.Add(req);
-                await _context.SaveChangesAsync();
+                _context.ScanSchedules.Add(newSchedule);
+                await _context.SaveChangesAsync(); 
 
                 if (req.TargetBranchIds != null && req.TargetBranchIds.Any())
                 {
                     var targets = req.TargetBranchIds.Select(branchId => new ScanScheduleTarget
                     {
-                        Tgt_schId = req.Sch_id,
+                        Tgt_schId = newSchedule.Sch_id,
                         Tgt_branchId = branchId
                     });
                     
@@ -63,7 +73,7 @@ namespace portscanner_backend.Controllers
                     await _context.SaveChangesAsync();
                 }
 
-                return Ok(new { message = "Jadwal berhasil disimpan", nextRun = req.Sch_nextRun });
+                return Ok(new { message = "Jadwal berhasil disimpan", nextRun = newSchedule.Sch_nextRun });
             }
             catch (Exception ex)
             {
@@ -110,6 +120,17 @@ namespace portscanner_backend.Controllers
                                             BranchCidr = b.Branch_cidr
                                         }).ToListAsync();
 
+            List<int>? parsedManualPorts = null;
+            if (!string.IsNullOrEmpty(schedule.Sch_targetManualPorts))
+            {
+                parsedManualPorts = schedule.Sch_targetManualPorts
+                    .Split(',')
+                    .Select(p => int.TryParse(p, out int val) ? val : (int?)null)
+                    .Where(val => val.HasValue)
+                    .Select(val => val.Value)
+                    .ToList();
+            }
+
             var dto = new ScheduleDetailDto
             {
                 Sch_id = schedule.Sch_id,
@@ -118,7 +139,7 @@ namespace portscanner_backend.Controllers
                 Sch_time = schedule.Sch_time.ToString(@"hh\:mm\:ss"),
                 Sch_portMode = schedule.Sch_portMode,
                 Sch_targetPortGroupId = schedule.Sch_targetPortGroupId,
-                Sch_targetManualPort = schedule.Sch_targetManualPort,
+                Sch_targetManualPorts = parsedManualPorts, // PERBAIKAN NAMA: pakai 's'
                 Sch_nextRun = schedule.Sch_nextRun,
                 Sch_isActive = schedule.Sch_isActive,
                 Targets = targetBranches
@@ -128,22 +149,31 @@ namespace portscanner_backend.Controllers
         }
 
         [HttpPost("{id}")]
-        public async Task<IActionResult> Update(int id, [FromBody] ScanSchedule req)
+        public async Task<IActionResult> Update(int id, [FromBody] ScheduleRequestDto req)
         {
             var schedule = await _context.ScanSchedules.FindAsync(id);
             if (schedule == null) return NotFound("Jadwal tidak ditemukan");
 
+            // PERBAIKAN: Parse string time ke TimeSpan
+            TimeSpan parsedTime;
+            if (!TimeSpan.TryParse(req.Sch_time, out parsedTime))
+            {
+                return BadRequest(new { message = "Format waktu tidak valid. Gunakan HH:mm:ss" });
+            }
+
             schedule.Sch_title = req.Sch_title;
             schedule.Sch_frequency = req.Sch_frequency;
-            schedule.Sch_time = req.Sch_time;
+            schedule.Sch_time = parsedTime; // Simpan sbg TimeSpan
             schedule.Sch_portMode = req.Sch_portMode;
             schedule.Sch_targetPortGroupId = req.Sch_targetPortGroupId;
-            schedule.Sch_targetManualPort = req.Sch_targetManualPort;
+            
+            schedule.Sch_targetManualPorts = req.Sch_targetManualPorts != null && req.Sch_targetManualPorts.Any() 
+                ? string.Join(",", req.Sch_targetManualPorts) 
+                : null;
 
             DateTime now = DateTime.UtcNow.AddHours(7);
-            DateTime newRunTime = now.Date.Add(req.Sch_time);
-            if (newRunTime > now) schedule.Sch_nextRun = newRunTime;
-            else schedule.Sch_nextRun = newRunTime.AddDays(1);
+            DateTime newRunTime = now.Date.Add(parsedTime);
+            schedule.Sch_nextRun = newRunTime > now ? newRunTime : newRunTime.AddDays(1);
 
             var oldTargets = _context.ScanScheduleTargets.Where(t => t.Tgt_schId == id);
             _context.ScanScheduleTargets.RemoveRange(oldTargets);
@@ -161,6 +191,5 @@ namespace portscanner_backend.Controllers
             await _context.SaveChangesAsync();
             return Ok(new { message = "Jadwal berhasil diupdate" });
         }
-
     }
 }
