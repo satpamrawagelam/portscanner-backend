@@ -1,5 +1,5 @@
 using System.ComponentModel.DataAnnotations;
-using System.ComponentModel.DataAnnotations.Schema;
+using System.Collections.Generic;
 
 namespace portscanner_backend.Models
 {
@@ -10,5 +10,6 @@ namespace portscanner_backend.Models
         public string Pg_name { get; set; } = string.Empty;
 
         public ICollection<PortMaster>? PortMasters { get; set; }
+        public ICollection<ScanSchedule>? ScanSchedules { get; set; }
     }
 }

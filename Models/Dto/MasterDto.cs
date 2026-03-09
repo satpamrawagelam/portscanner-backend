@@ -3,9 +3,9 @@ namespace portscanner_backend.Models.Dto
     // Master Port
     public class PortMasterDto 
     { 
-        public int Pm_portGroup { get; set; }
-        public int Pm_portNumber { get; set; }
-        public string? Pm_desc { get; set; }
+        public int Pg_id { get; set; }
+        public int Pm_port_number { get; set; }
+        public string? Pm_port_desc { get; set; }
         public string Pm_severity { get; set; } = "Low";
     }
 

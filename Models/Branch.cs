@@ -1,4 +1,5 @@
 using System.ComponentModel.DataAnnotations;
+using System.Collections.Generic;
 
 namespace portscanner_backend.Models
 {
@@ -10,6 +11,6 @@ namespace portscanner_backend.Models
         public string Branch_cidr { get; set; } = string.Empty;
 
         public ICollection<IpAddress>? IpAddresses { get; set; }
-        public ICollection<Port>? Ports { get; set; }
+        public ICollection<ScanScheduleTarget>? ScanScheduleTargets { get; set; }
     }
 }

@@ -22,7 +22,7 @@ namespace portscanner_backend.Controllers
         public async Task<IActionResult> GetBranches()
         {
             var branches = await _context.Branches
-                .FromSqlRaw("EXEC sp_GetAllBranches")
+                .FromSqlRaw("EXEC V2_sp_GetAllBranches")
                 .ToListAsync();
 
             return Ok(branches);
@@ -34,7 +34,7 @@ namespace portscanner_backend.Controllers
         public async Task<IActionResult> GetAll()
         {
             var data = await _context.Branches
-                .FromSqlRaw("EXEC sp_GetAllBranches")
+                .FromSqlRaw("EXEC V2_sp_GetAllBranches")
                 .ToListAsync();
             return Ok(data);
         }
@@ -45,7 +45,7 @@ namespace portscanner_backend.Controllers
             var pName = new SqlParameter("@Name", req.Branch_name);
             var pCidr = new SqlParameter("@Cidr", req.Branch_cidr ?? "");
 
-            await _context.Database.ExecuteSqlRawAsync("EXEC sp_AddBranch @Name, @Cidr", pName, pCidr);
+            await _context.Database.ExecuteSqlRawAsync("EXEC V2_sp_AddBranch @Name, @Cidr", pName, pCidr);
             return Ok(new { message = "Branch Created" });
         }
 
@@ -56,7 +56,7 @@ namespace portscanner_backend.Controllers
             var pName = new SqlParameter("@Name", req.Branch_name);
             var pCidr = new SqlParameter("@Cidr", req.Branch_cidr ?? "");
 
-            await _context.Database.ExecuteSqlRawAsync("EXEC sp_UpdateBranch @Id, @Name, @Cidr", pId, pName, pCidr);
+            await _context.Database.ExecuteSqlRawAsync("EXEC V2_sp_UpdateBranch @Id, @Name, @Cidr", pId, pName, pCidr);
             return Ok(new { message = "Branch Updated" });
         }
 
@@ -64,7 +64,7 @@ namespace portscanner_backend.Controllers
         public async Task<IActionResult> Delete(int id)
         {
             var pId = new SqlParameter("@Id", id);
-            await _context.Database.ExecuteSqlRawAsync("EXEC sp_DeleteBranch @Id", pId);
+            await _context.Database.ExecuteSqlRawAsync("EXEC V2_sp_DeleteBranch @Id", pId);
             return Ok(new { message = "Branch Deleted" });
         }
     }

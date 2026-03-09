@@ -45,13 +45,13 @@ namespace portscanner_backend.Controllers
                 if (req.Pg_id == 0)
                 {
                     portsToScan = await _context.PortMasters
-                        .Select(p => p.Pm_portNumber).Distinct().ToListAsync();
+                        .Select(p => p.Pm_port_number).Distinct().ToListAsync();
                 } 
                 else 
                 {
                     portsToScan = await _context.PortMasters
-                        .Where(p => p.Pm_portGroup == req.Pg_id)
-                        .Select(p => p.Pm_portNumber).Distinct().ToListAsync();
+                        .Where(p => p.Pg_id == req.Pg_id)
+                        .Select(p => p.Pm_port_number).Distinct().ToListAsync();
                 }
             }
             else
@@ -63,15 +63,12 @@ namespace portscanner_backend.Controllers
 
             var scanResults = await _scanService.ExecuteSubnetScanAsync(
                 branch.Branch_cidr,
-                portsToScan,
-                config.MaxConcurrency,
-                config.PingTimeout,
-                config.PortScanTimeout
+                portsToScan
             );
 
             var portSeverities = await _context.PortMasters
-                .GroupBy(p => p.Pm_portNumber)
-                .ToDictionaryAsync(g => g.Key, g => g.First().Pm_severity);
+                .GroupBy(p => p.Pm_port_number)
+                .ToDictionaryAsync(g => g.Key, g => "Medium");
 
             foreach (var host in scanResults)
             {

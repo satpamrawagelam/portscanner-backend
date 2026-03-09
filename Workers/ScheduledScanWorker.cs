@@ -50,7 +50,7 @@ namespace portscanner_backend.Workers
             if (!dueSchedules.Any()) return;
 
             var portSeverities = await context.PortMasters
-                .ToDictionaryAsync(p => p.Pm_portNumber, p => p.Pm_severity);
+                .ToDictionaryAsync(p => p.Pm_port_number, p => "Medium");
 
             var config = await context.AppConfigs.FirstOrDefaultAsync() ?? new AppConfig
             {
@@ -93,33 +93,32 @@ namespace portscanner_backend.Workers
 
         private async Task<List<int>> ResolveTargetPorts(AppDbContext context, Models.ScanSchedule schedule)
         {
-            if (schedule.Sch_portMode == "single" && !string.IsNullOrEmpty(schedule.Sch_targetManualPorts))
+            if (schedule.Sch_portMode == "single" || schedule.Sch_portMode == "Custom")
             {
-                return schedule.Sch_targetManualPorts
-                    .Split(',')
-                    .Select(p => int.TryParse(p, out int val) ? val : (int?)null)
-                    .Where(val => val.HasValue)
-                    .Select(val => val.Value)
-                    .ToList();
+                return await context.ScanSchedulePorts
+                    .Include(sp => sp.PortMaster)
+                    .Where(sp => sp.Sch_id == schedule.Sch_id)
+                    .Select(sp => sp.PortMaster!.Pm_port_number)
+                    .ToListAsync();
             }
 
-            if (schedule.Sch_portMode == "group" && schedule.Sch_targetPortGroupId.HasValue)
+            if (schedule.Sch_portMode == "group" && schedule.Sch_pgId.HasValue)
             {
-                if (schedule.Sch_targetPortGroupId.Value == 0)
+                if (schedule.Sch_pgId.Value == 0)
                 {
-                    return await context.PortMasters.Select(pm => pm.Pm_portNumber).Distinct().ToListAsync();
+                    return await context.PortMasters.Select(pm => pm.Pm_port_number).Distinct().ToListAsync();
                 }
 
                 return await context.PortMasters
-                    .Where(pm => pm.Pm_portGroup == schedule.Sch_targetPortGroupId)
-                    .Select(pm => pm.Pm_portNumber)
-                    .Distinct() // Jaga-jaga kalau ada duplikat di master
+                    .Where(pm => pm.Pg_id == schedule.Sch_pgId)
+                    .Select(pm => pm.Pm_port_number)
+                    .Distinct()
                     .ToListAsync();
             }
 
             if (schedule.Sch_portMode == "all")
             {
-                return await context.PortMasters.Select(pm => pm.Pm_portNumber).Distinct().ToListAsync();
+                return await context.PortMasters.Select(pm => pm.Pm_port_number).Distinct().ToListAsync();
             }
 
             return new List<int>();
@@ -165,10 +164,7 @@ namespace portscanner_backend.Workers
 
                             var scanResults = await scopedScanService.ExecuteSubnetScanAsync(
                                 currentBranch.Branch_cidr,
-                                ports,
-                                config.MaxConcurrency,
-                                config.PingTimeout,
-                                config.PortScanTimeout
+                                ports
                             );
 
                             foreach (var host in scanResults)

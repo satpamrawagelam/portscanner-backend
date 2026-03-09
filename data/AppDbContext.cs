@@ -12,13 +12,16 @@ namespace portscanner_backend.Data
 
         public DbSet<Branch> Branches { get; set; }
         public DbSet<IpAddress> IpAddresses { get; set; }
-        public DbSet<Port> Ports { get; set; }
-        public DbSet<ScanResult> ScanResults { get; set; }
         public DbSet<PortMaster> PortMasters { get; set; }
         public DbSet<PortGroup> PortGroups { get; set; }
+        public DbSet<HostPort> HostPorts { get; set; }
         public DbSet<AppConfig> AppConfigs { get; set; }
         public DbSet<ScanSchedule> ScanSchedules { get; set; }
-        public DbSet<ScanScheduleTarget> ScanScheduleTargets { get; set;}
+        public DbSet<ScanScheduleTarget> ScanScheduleTargets { get; set; }
+        public DbSet<ScanSchedulePort> ScanSchedulePorts { get; set; }
+        public DbSet<ScanSession> ScanSessions { get; set; }
+        public DbSet<ScanHostResult> ScanHostResults { get; set; }
+        public DbSet<ScanPortResult> ScanPortResults { get; set; }
 
         public DbSet<DashboardPortStatusOverviewDto> DashboardOverviews { get; set; }
         public DbSet<BranchHealthOverviewDto> BranchHealthOverviews { get; set; }
@@ -33,12 +36,6 @@ namespace portscanner_backend.Data
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
             base.OnModelCreating(modelBuilder);
-
-            modelBuilder.Entity<ScanResult>()
-                .HasOne(sr => sr.Port)
-                .WithMany(p => p.ScanResults)
-                .HasForeignKey(sr => sr.Res_portId)
-                .OnDelete(DeleteBehavior.Restrict); 
 
             modelBuilder.Entity<DashboardPortStatusOverviewDto>().HasNoKey();
             modelBuilder.Entity<BranchHealthOverviewDto>().HasNoKey();

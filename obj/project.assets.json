@@ -4236,11 +4236,11 @@
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "D:\\MAGANG\\PAMA\\Project\\TEEESSS\\portscanner-backend\\portscanner-backend.csproj",
+      "projectUniqueName": "D:\\MAGANG\\PAMA\\Project\\EEC New Schema\\portscanner-backend\\portscanner-backend.csproj",
       "projectName": "portscanner-backend",
-      "projectPath": "D:\\MAGANG\\PAMA\\Project\\TEEESSS\\portscanner-backend\\portscanner-backend.csproj",
+      "projectPath": "D:\\MAGANG\\PAMA\\Project\\EEC New Schema\\portscanner-backend\\portscanner-backend.csproj",
       "packagesPath": "C:\\Users\\Lenovo\\.nuget\\packages\\",
-      "outputPath": "D:\\MAGANG\\PAMA\\Project\\TEEESSS\\portscanner-backend\\obj\\",
+      "outputPath": "D:\\MAGANG\\PAMA\\Project\\EEC New Schema\\portscanner-backend\\obj\\",
       "projectStyle": "PackageReference",
       "fallbackFolders": [
         "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"

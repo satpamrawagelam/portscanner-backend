@@ -31,7 +31,7 @@ namespace portscanner_backend.Controllers
                 var pSize = new Microsoft.Data.SqlClient.SqlParameter("@PageSize", pageSize);
 
                 var rawData = await _context.Set<ScanHistoryDto>()
-                    .FromSqlRaw("EXEC sp_GetScanHistoryLog @ScanType, @SearchTerm, @PageNumber, @PageSize", 
+                    .FromSqlRaw("EXEC V2_sp_GetScanHistoryLog @ScanType, @SearchTerm, @PageNumber, @PageSize", 
                         pScanType, pSearch, pPage, pSize)
                     .ToListAsync();
 

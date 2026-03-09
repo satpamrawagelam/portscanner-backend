@@ -22,7 +22,7 @@ namespace portscanner_backend.Controllers
         {
             var pGroup = new SqlParameter("@GroupId", groupId);
             var ports = await _context.PortMasters
-                .FromSqlRaw("EXEC sp_GetPortsByGroup @GroupId", pGroup)
+                .FromSqlRaw("EXEC V2_sp_GetPortsByGroup @GroupId", pGroup)
                 .ToListAsync();
 
             return Ok(ports);
@@ -31,13 +31,13 @@ namespace portscanner_backend.Controllers
         [HttpPost]
         public async Task<IActionResult> Create([FromBody] PortMasterDto req)
         {
-            var pGroup = new SqlParameter("@GroupId", req.Pm_portGroup);
-            var pPort = new SqlParameter("@PortNumber", req.Pm_portNumber);
-            var pDesc = new SqlParameter("@Desc", req.Pm_desc ?? ""); 
+            var pGroup = new SqlParameter("@GroupId", req.Pg_id);
+            var pPort = new SqlParameter("@PortNumber", req.Pm_port_number);
+            var pDesc = new SqlParameter("@Desc", req.Pm_port_desc ?? ""); 
             var pSev = new SqlParameter("@Severity", req.Pm_severity ?? "Low");
 
             await _context.Database.ExecuteSqlRawAsync(
-                "EXEC sp_AddPortMaster @GroupId, @PortNumber, @Desc, @Severity", 
+                "EXEC V2_sp_AddPortMaster @GroupId, @PortNumber, @Desc, @Severity", 
                 pGroup, pPort, pDesc, pSev
             );
 
@@ -48,12 +48,12 @@ namespace portscanner_backend.Controllers
         public async Task<IActionResult> Update(int id, [FromBody] PortMasterDto req)
         {
             var pId = new SqlParameter("@Id", id);
-            var pPort = new SqlParameter("@PortNumber", req.Pm_portNumber);
-            var pDesc = new SqlParameter("@Desc", req.Pm_desc ?? "");
+            var pPort = new SqlParameter("@PortNumber", req.Pm_port_number);
+            var pDesc = new SqlParameter("@Desc", req.Pm_port_desc ?? "");
             var pSev = new SqlParameter("@Severity", req.Pm_severity ?? "Low");
 
             await _context.Database.ExecuteSqlRawAsync(
-                "EXEC sp_UpdatePortMaster @Id, @PortNumber, @Desc, @Severity", 
+                "EXEC V2_sp_UpdatePortMaster @Id, @PortNumber, @Desc, @Severity", 
                 pId, pPort, pDesc, pSev
             );
 
@@ -64,7 +64,7 @@ namespace portscanner_backend.Controllers
         public async Task<IActionResult> Delete(int id)
         {
             var pId = new SqlParameter("@Id", id);
-            await _context.Database.ExecuteSqlRawAsync("EXEC sp_DeletePortMaster @Id", pId);
+            await _context.Database.ExecuteSqlRawAsync("EXEC V2_sp_DeletePortMaster @Id", pId);
             return Ok(new { message = "Deleted" });
         }
     }

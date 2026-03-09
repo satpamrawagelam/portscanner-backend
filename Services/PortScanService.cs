@@ -103,14 +103,17 @@ namespace portscanner_backend.Services
 
         public async Task<List<IpScanResultDto>> ExecuteSubnetScanAsync(
             string cidr, 
-            List<int> targetPorts, 
-            int concurrency = 50, 
-            int pingTimeout = 1000, 
-            int portTimeout = 1000)
+            List<int> targetPorts)
         {
+            var config = await _context.AppConfigs.FirstOrDefaultAsync() ?? new AppConfig();
+            int concurrency = config.MaxConcurrency;
+            int pingTimeout = config.PingTimeout;
+            int pingRetries = config.PingRetries;
+            int portTimeout = config.PortScanTimeout;
+
             var ips = ExpandCidr(cidr);
 
-            var hostStatusDict = await CheckHostsAvailabilityAsync(ips, concurrency, pingTimeout, 2);
+            var hostStatusDict = await CheckHostsAvailabilityAsync(ips, concurrency, pingTimeout, pingRetries);
 
             var results = new ConcurrentBag<IpScanResultDto>();
             var semaphore = new SemaphoreSlim(concurrency);
@@ -158,47 +161,112 @@ namespace portscanner_backend.Services
 
         public async Task BulkSaveResultsAsync(int branchId, List<IpScanResultDto> results, string scanTitle, string scanType, int? schId = null)
         {
-            var table = new DataTable();
-            table.Columns.Add("BranchId", typeof(int));
-            table.Columns.Add("IpAddress", typeof(string));
-            table.Columns.Add("PortNumber", typeof(int));
-            table.Columns.Add("IsOpen", typeof(bool));
-            table.Columns.Add("ScanDate", typeof(DateTime));
-            table.Columns.Add("Res_title", typeof(string));
-            table.Columns.Add("Res_type", typeof(string));
-            table.Columns.Add("HostStatus", typeof(bool));
+            var session = new ScanSession 
+            {
+                Title = scanTitle,
+                Type = scanType,
+                ScanDate = DateTime.UtcNow.AddHours(7) 
+            };
+            _context.ScanSessions.Add(session);
+            await _context.SaveChangesAsync();
 
-            var scanDateTemp = DateTime.UtcNow.AddHours(7);
+            // Ganti lookup "semua port" ke versi longgar yg bisa nembus ke custom ports:
+            // Krn 1 Nomor Port bisa ada di banyak group, Dictionary tidak bisa dipakai krn duplikat Key.
+            // Gunakan List / Array. Karena sekarang kita menyimpan PortNumber (Bukan Pm_Id).
+
+            var branchIps = await _context.IpAddresses.Where(i => i.Ip_branchId == branchId).ToListAsync();
+            var ipDict = branchIps.ToDictionary(i => i.Ip_address, i => i);
+
+            var existingHostPortsList = await _context.HostPorts
+                .Include(hp => hp.IpAddress)
+                .Where(hp => hp.IpAddress.Ip_branchId == branchId)
+                .ToListAsync();
+            
+            var hostPortDict = existingHostPortsList
+                .GroupBy(hp => hp.IpAddress.Ip_address)
+                .ToDictionary(g => g.Key, g => g.ToDictionary(hp => hp.Port_number, hp => hp));
 
             foreach (var ipResult in results)
             {
-                if (ipResult.Ports != null && ipResult.Ports.Any())
+                if (!ipDict.TryGetValue(ipResult.Ip, out var ipEntity))
+                {
+                    ipEntity = new IpAddress 
+                    {
+                        Ip_branchId = branchId,
+                        Ip_address = ipResult.Ip,
+                        Ip_isAlive = ipResult.IsHostAlive,
+                        Ip_lastScanned = session.ScanDate
+                    };
+                    _context.IpAddresses.Add(ipEntity);
+                    ipDict[ipResult.Ip] = ipEntity;
+                }
+                else
+                {
+                    ipEntity.Ip_isAlive = ipResult.IsHostAlive;
+                    ipEntity.Ip_lastScanned = session.ScanDate;
+                }
+            }
+            await _context.SaveChangesAsync();
+
+            foreach (var ipResult in results)
+            {
+                var ipEntity = ipDict[ipResult.Ip];
+                
+                var hostRes = new ScanHostResult
+                {
+                    Session_id = session.Session_id,
+                    Ip_id = ipEntity.Ip_id,
+                    IsAlive = ipResult.IsHostAlive
+                };
+                _context.ScanHostResults.Add(hostRes);
+
+                hostPortDict.TryGetValue(ipResult.Ip, out var currentHostPortsDict);
+
+                if (ipResult.Ports != null)
                 {
                     foreach (var portResult in ipResult.Ports)
                     {
-                        table.Rows.Add(
-                            branchId,
-                            ipResult.Ip,
-                            portResult.Port,
-                            portResult.Status,
-                            scanDateTemp,
-                            scanTitle,
-                            scanType,
-                            ipResult.IsHostAlive
-                        );
+                        var pNum = portResult.Port;
+                        
+                        // HAPUS syarat "harus terdaftar di PortMaster" (allPorts) krn manual/custom port diperbolehkan:
+                        
+                        if (portResult.Status)
+                        {
+                            var portRes = new ScanPortResult
+                            {
+                                ScanHostResult = hostRes, 
+                                Port_number = pNum
+                            };
+                            _context.ScanPortResults.Add(portRes);
+                        }
+
+                        if (currentHostPortsDict != null && currentHostPortsDict.TryGetValue(pNum, out var existingHp))
+                        {
+                            existingHp.Status = portResult.Status;
+                            existingHp.Last_Updated = session.ScanDate;
+                        }
+                        else
+                        {
+                            var newHp = new HostPort
+                            {
+                                Ip_id = ipEntity.Ip_id,
+                                Port_number = pNum,
+                                Status = portResult.Status,
+                                Last_Updated = session.ScanDate
+                            };
+                            _context.HostPorts.Add(newHp);
+                            if (currentHostPortsDict == null)
+                            {
+                                currentHostPortsDict = new Dictionary<int, HostPort>();
+                                hostPortDict[ipResult.Ip] = currentHostPortsDict;
+                            }
+                            currentHostPortsDict[pNum] = newHp;
+                        }
                     }
                 }
             }
 
-            var pScanData = new SqlParameter("@ScanData", SqlDbType.Structured)
-            {
-                TypeName = "dbo.ScanResultType",
-                Value = table
-            };
-
-            var pSchId = new SqlParameter("@SchId", schId.HasValue ? (object)schId.Value : DBNull.Value);
-
-            await _context.Database.ExecuteSqlRawAsync("EXEC sp_BulkSaveScanResults @ScanData, @SchId", pScanData, pSchId);
+            await _context.SaveChangesAsync();
         }
     }
 }

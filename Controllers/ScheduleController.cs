@@ -48,18 +48,15 @@ namespace portscanner_backend.Controllers
                     Sch_title = req.Sch_title,
                     Sch_frequency = req.Sch_frequency,
                     Sch_time = parsedTime, // Simpan sbg TimeSpan di Database
-                    Sch_portMode = req.Sch_portMode,
-                    Sch_targetPortGroupId = req.Sch_targetPortGroupId,
-                    Sch_targetManualPorts = req.Sch_targetManualPorts != null && req.Sch_targetManualPorts.Any() 
-                        ? string.Join(",", req.Sch_targetManualPorts) 
-                        : null,
+                    Sch_portMode = req.Sch_pgId == 0 ? "all" : req.Sch_portMode,
+                    Sch_pgId = req.Sch_pgId == 0 ? null : (req.Sch_portMode == "all" ? null : req.Sch_pgId),
                     Sch_createdDate = now,
                     Sch_isActive = true,
                     Sch_nextRun = todayRun > now ? todayRun : todayRun.AddDays(1)
                 };
 
                 _context.ScanSchedules.Add(newSchedule);
-                await _context.SaveChangesAsync(); 
+                await _context.SaveChangesAsync();
 
                 if (req.TargetBranchIds != null && req.TargetBranchIds.Any())
                 {
@@ -68,10 +65,29 @@ namespace portscanner_backend.Controllers
                         Tgt_schId = newSchedule.Sch_id,
                         Tgt_branchId = branchId
                     });
-                    
                     await _context.ScanScheduleTargets.AddRangeAsync(targets);
-                    await _context.SaveChangesAsync();
                 }
+
+                if ((req.Sch_portMode == "Custom" || req.Sch_portMode == "single") && req.Sch_targetManualPort != null && req.Sch_targetManualPort.Any())
+                {
+                    // 1. Simpan string list-nya langsung di tabel ScanSchedule agar port custom tak terdaftar (unlisted) tidak hilang
+                    newSchedule.Sch_customPorts = string.Join(",", req.Sch_targetManualPort);
+                    
+                    // 2. Jika secara kebetulan ada Port tsb di PortMasters, buat relasinya jg untuk UI
+                    var pmIds = await _context.PortMasters
+                        .Where(pm => req.Sch_targetManualPort.Contains(pm.Pm_port_number))
+                        .Select(pm => pm.Pm_id)
+                        .ToListAsync();
+
+                    var schPorts = pmIds.Select(pmId => new ScanSchedulePort
+                    {
+                        Sch_id = newSchedule.Sch_id,
+                        Pm_id = pmId
+                    });
+                    await _context.ScanSchedulePorts.AddRangeAsync(schPorts);
+                }
+
+                await _context.SaveChangesAsync();
 
                 return Ok(new { message = "Jadwal berhasil disimpan", nextRun = newSchedule.Sch_nextRun });
             }
@@ -86,6 +102,12 @@ namespace portscanner_backend.Controllers
         {
             var item = await _context.ScanSchedules.FindAsync(id);
             if (item == null) return NotFound();
+
+            var oldTargets = _context.ScanScheduleTargets.Where(t => t.Tgt_schId == id);
+            _context.ScanScheduleTargets.RemoveRange(oldTargets);
+
+            var oldPorts = _context.ScanSchedulePorts.Where(p => p.Sch_id == id);
+            _context.ScanSchedulePorts.RemoveRange(oldPorts);
 
             _context.ScanSchedules.Remove(item);
             await _context.SaveChangesAsync();
@@ -121,14 +143,22 @@ namespace portscanner_backend.Controllers
                                         }).ToListAsync();
 
             List<int>? parsedManualPorts = null;
-            if (!string.IsNullOrEmpty(schedule.Sch_targetManualPorts))
+            if (schedule.Sch_portMode == "Custom" || schedule.Sch_portMode == "single")
             {
-                parsedManualPorts = schedule.Sch_targetManualPorts
-                    .Split(',')
-                    .Select(p => int.TryParse(p, out int val) ? val : (int?)null)
-                    .Where(val => val.HasValue)
-                    .Select(val => val.Value)
-                    .ToList();
+                if (!string.IsNullOrEmpty(schedule.Sch_customPorts))
+                {
+                    parsedManualPorts = schedule.Sch_customPorts.Split(',')
+                                        .Select(int.Parse)
+                                        .ToList();
+                }
+                else
+                {
+                    parsedManualPorts = await _context.ScanSchedulePorts
+                        .Include(sp => sp.PortMaster)
+                        .Where(sp => sp.Sch_id == schedule.Sch_id)
+                        .Select(sp => sp.PortMaster!.Pm_port_number)
+                        .ToListAsync();
+                }
             }
 
             var dto = new ScheduleDetailDto
@@ -137,9 +167,9 @@ namespace portscanner_backend.Controllers
                 Sch_title = schedule.Sch_title,
                 Sch_frequency = schedule.Sch_frequency,
                 Sch_time = schedule.Sch_time.ToString(@"hh\:mm\:ss"),
-                Sch_portMode = schedule.Sch_portMode,
-                Sch_targetPortGroupId = schedule.Sch_targetPortGroupId,
-                Sch_targetManualPorts = parsedManualPorts, // PERBAIKAN NAMA: pakai 's'
+                Sch_portMode = schedule.Sch_portMode == "all" ? "group" : schedule.Sch_portMode,
+                Sch_pgId = schedule.Sch_portMode == "all" ? 0 : schedule.Sch_pgId,
+                Sch_targetManualPort = parsedManualPorts,
                 Sch_nextRun = schedule.Sch_nextRun,
                 Sch_isActive = schedule.Sch_isActive,
                 Targets = targetBranches
@@ -164,12 +194,8 @@ namespace portscanner_backend.Controllers
             schedule.Sch_title = req.Sch_title;
             schedule.Sch_frequency = req.Sch_frequency;
             schedule.Sch_time = parsedTime; // Simpan sbg TimeSpan
-            schedule.Sch_portMode = req.Sch_portMode;
-            schedule.Sch_targetPortGroupId = req.Sch_targetPortGroupId;
-            
-            schedule.Sch_targetManualPorts = req.Sch_targetManualPorts != null && req.Sch_targetManualPorts.Any() 
-                ? string.Join(",", req.Sch_targetManualPorts) 
-                : null;
+            schedule.Sch_portMode = req.Sch_pgId == 0 ? "all" : req.Sch_portMode;
+            schedule.Sch_pgId = req.Sch_pgId == 0 ? null : (req.Sch_portMode == "all" ? null : req.Sch_pgId);
 
             DateTime now = DateTime.UtcNow.AddHours(7);
             DateTime newRunTime = now.Date.Add(parsedTime);
@@ -177,6 +203,9 @@ namespace portscanner_backend.Controllers
 
             var oldTargets = _context.ScanScheduleTargets.Where(t => t.Tgt_schId == id);
             _context.ScanScheduleTargets.RemoveRange(oldTargets);
+
+            var oldPorts = _context.ScanSchedulePorts.Where(p => p.Sch_id == id);
+            _context.ScanSchedulePorts.RemoveRange(oldPorts);
 
             if (req.TargetBranchIds != null && req.TargetBranchIds.Any())
             {
@@ -186,6 +215,27 @@ namespace portscanner_backend.Controllers
                     Tgt_branchId = bid
                 });
                 await _context.ScanScheduleTargets.AddRangeAsync(newTargets);
+            }
+
+            if ((req.Sch_portMode == "Custom" || req.Sch_portMode == "single") && req.Sch_targetManualPort != null && req.Sch_targetManualPort.Any())
+            {
+                schedule.Sch_customPorts = string.Join(",", req.Sch_targetManualPort);
+
+                var pmIds = await _context.PortMasters
+                    .Where(pm => req.Sch_targetManualPort.Contains(pm.Pm_port_number))
+                    .Select(pm => pm.Pm_id)
+                    .ToListAsync();
+
+                var schPorts = pmIds.Select(pmId => new ScanSchedulePort
+                {
+                    Sch_id = id,
+                    Pm_id = pmId
+                });
+                await _context.ScanSchedulePorts.AddRangeAsync(schPorts);
+            }
+            else
+            {
+                schedule.Sch_customPorts = null;
             }
 
             await _context.SaveChangesAsync();

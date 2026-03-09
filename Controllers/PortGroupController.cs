@@ -23,7 +23,7 @@ namespace portscanner_backend.Controllers
         public async Task<IActionResult> GetAll()
         {
             var groups = await _context.PortGroups
-                .FromSqlRaw("EXEC sp_GetAllPortGroupsDD")
+                .FromSqlRaw("EXEC V2_sp_GetAllPortGroupsDD")
                 .ToListAsync();
 
             return Ok(groups);
@@ -33,7 +33,7 @@ namespace portscanner_backend.Controllers
         public async Task<IActionResult> GetAllPortGroup()
         {
             var groups = await _context.Set<PortGroupResult>()
-                .FromSqlRaw("EXEC sp_GetAllPortGroups")
+                .FromSqlRaw("EXEC V2_sp_GetAllPortGroups")
                 .ToListAsync();
             return Ok(groups);
         }
@@ -42,7 +42,7 @@ namespace portscanner_backend.Controllers
         public async Task<IActionResult> Add([FromBody] PortGroupDto req)
         {
             var param = new SqlParameter("@Name", req.Pg_name);
-            await _context.Database.ExecuteSqlRawAsync("EXEC sp_AddPortGroup @Name", param);
+            await _context.Database.ExecuteSqlRawAsync("EXEC V2_sp_AddPortGroup @Name", param);
             return Ok(new { message = "Success" });
         }
 
@@ -51,7 +51,7 @@ namespace portscanner_backend.Controllers
         {
             var pId = new SqlParameter("@Id", id);
             var pName = new SqlParameter("@Name", req.Pg_name);
-            await _context.Database.ExecuteSqlRawAsync("EXEC sp_UpdatePortGroup @Id, @Name", pId, pName);
+            await _context.Database.ExecuteSqlRawAsync("EXEC V2_sp_UpdatePortGroup @Id, @Name", pId, pName);
             return Ok(new { message = "Updated" });
         }
 
@@ -61,7 +61,7 @@ namespace portscanner_backend.Controllers
             try 
             {
                 var pId = new SqlParameter("@Id", id);
-                await _context.Database.ExecuteSqlRawAsync("EXEC sp_DeletePortGroup @Id", pId);
+                await _context.Database.ExecuteSqlRawAsync("EXEC V2_sp_DeletePortGroup @Id", pId);
                 return Ok(new { message = "Deleted" });
             }
             catch (Exception ex)

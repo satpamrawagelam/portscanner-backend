@@ -17,7 +17,7 @@ namespace portscanner_backend.Services
         public async Task<DashboardPortStatusOverviewDto> GetPortStatusOverview()
         {
             var result = await _context.DashboardOverviews
-                .FromSqlRaw("EXEC sp_GetDashboardOverview")
+                .FromSqlRaw("EXEC V2_sp_GetDashboardOverview")
                 .ToListAsync();
 
             return result.FirstOrDefault() ?? new DashboardPortStatusOverviewDto();
@@ -26,7 +26,7 @@ namespace portscanner_backend.Services
         public async Task<List<BranchHealthOverviewDto>> GetBranchHealthAsync()
         {
             var result = await _context.BranchHealthOverviews
-                .FromSqlRaw("EXEC sp_GetBranchHealth")
+                .FromSqlRaw("EXEC V2_sp_GetBranchHealth")
                 .ToListAsync();
 
             return result;
@@ -35,7 +35,7 @@ namespace portscanner_backend.Services
         public async Task<BranchDetailDto?> GetBranchDetailAsync(int branchId)
         {
             var rawData = await _context.BranchDetailRaws
-                .FromSqlRaw("EXEC sp_GetBranchDetail @BranchId", new SqlParameter("@BranchId", branchId))
+                .FromSqlRaw("EXEC V2_sp_GetBranchDetail @BranchId", new SqlParameter("@BranchId", branchId))
                 .ToListAsync();
 
             if (!rawData.Any()) return null;
@@ -76,7 +76,7 @@ namespace portscanner_backend.Services
             var pYear = new SqlParameter("@Year", year ?? DateTime.Now.Year);
 
             var data = await _context.GlobalTrends
-                .FromSqlRaw("EXEC sp_GetGlobalTrend @Month, @Year", pMonth, pYear)
+                .FromSqlRaw("EXEC V2_sp_GetGlobalTrend @Month, @Year", pMonth, pYear)
                 .ToListAsync();
 
             return data;
@@ -85,7 +85,7 @@ namespace portscanner_backend.Services
         public async Task<List<RiskDistributionDto>> GetRiskDistributionAsync()
         {
             var data = await _context.RiskDistributions
-                .FromSqlRaw("EXEC sp_GetRiskDistribution")
+                .FromSqlRaw("EXEC V2_sp_GetRiskDistribution")
                 .ToListAsync();
             return data;
         }
