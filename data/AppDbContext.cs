@@ -37,6 +37,21 @@ namespace portscanner_backend.Data
         {
             base.OnModelCreating(modelBuilder);
 
+            Mapping EF Core Entities ke V2 Server Tables
+            modelBuilder.Entity<Branch>().ToTable("V2_Branches");
+            modelBuilder.Entity<IpAddress>().ToTable("V2_IpAddresses");
+            modelBuilder.Entity<PortMaster>().ToTable("V2_PortMasters");
+            modelBuilder.Entity<PortGroup>().ToTable("V2_PortGroups");
+            modelBuilder.Entity<HostPort>().ToTable("V2_HostPorts");
+            modelBuilder.Entity<AppConfig>().ToTable("V2_AppConfigs");
+            modelBuilder.Entity<ScanSchedule>().ToTable("V2_ScanSchedules");
+            modelBuilder.Entity<ScanScheduleTarget>().ToTable("V2_ScanScheduleTargets");
+            modelBuilder.Entity<ScanSchedulePort>().ToTable("V2_ScanSchedulePorts");
+            modelBuilder.Entity<ScanSession>().ToTable("V2_ScanSessions");
+            modelBuilder.Entity<ScanHostResult>().ToTable("V2_ScanHostResults");
+            modelBuilder.Entity<ScanPortResult>().ToTable("V2_ScanPortResults");
+
+            // Keyless Entities
             modelBuilder.Entity<DashboardPortStatusOverviewDto>().HasNoKey();
             modelBuilder.Entity<BranchHealthOverviewDto>().HasNoKey();
             modelBuilder.Entity<PortGroupResult>().HasNoKey();

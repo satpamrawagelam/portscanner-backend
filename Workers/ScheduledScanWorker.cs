@@ -3,6 +3,9 @@ using portscanner_backend.Data;
 using portscanner_backend.Services;
 using portscanner_backend.Models;
 using portscanner_backend.Models.Dto;
+using portscanner_backend.Controllers;
+using System.Collections.Concurrent;
+using System.Text;
 
 namespace portscanner_backend.Workers
 {
@@ -47,10 +50,18 @@ namespace portscanner_backend.Workers
                 .Where(s => s.Sch_isActive && s.Sch_nextRun <= now)
                 .ToListAsync();
 
-            if (!dueSchedules.Any()) return;
+            var temp = await context.ScanSchedules.ToListAsync();
+            _logger.LogInformation("JUMLAH : "+ temp.Count.ToString());    
+
+            if (!dueSchedules.Any()){
+                _logger.LogInformation("TIDAK ADA JADWAL YANG HARUS DIJALANKAN (" + now.ToString("dd-MM-yyyy HH:mm:ss") + ")");
+                return;
+            } 
 
             var portSeverities = await context.PortMasters
-                .ToDictionaryAsync(p => p.Pm_port_number, p => "Medium");
+                .Select(p => p.Pm_port_number)
+                .Distinct()
+                .ToDictionaryAsync(port => port, port => "Medium");
 
             var config = await context.AppConfigs.FirstOrDefaultAsync() ?? new AppConfig
             {
@@ -147,6 +158,7 @@ namespace portscanner_backend.Workers
             }
 
             var tasks = new List<Task>();
+            var allChanges = new ConcurrentBag<PortChangeAlertDto>();
 
             foreach (var branch in branches)
             {
@@ -179,13 +191,24 @@ namespace portscanner_backend.Workers
 
                             if (scanResults.Any())
                             {
-                                await scopedScanService.BulkSaveResultsAsync(
+                                var branchChanges = await scopedScanService.BulkSaveResultsAsync(
                                     currentBranch.Branch_id,
                                     scanResults,
                                     schedule.Sch_title,
                                     "Scheduled Scan",
                                     schedule.Sch_id
                                 );
+
+                                foreach (var chg in branchChanges)
+                                {
+                                    allChanges.Add(new PortChangeAlertDto
+                                    {
+                                        BranchName = currentBranch.Branch_name,
+                                        IpAddress = chg.IpAddress,
+                                        PortNumber = chg.PortNumber,
+                                        IsNowOpen = chg.IsNowOpen
+                                    });
+                                }
                             }
                             
                             _logger.LogInformation($"Selesai Branch {currentBranch.Branch_name}.");
@@ -200,6 +223,112 @@ namespace portscanner_backend.Workers
 
             await Task.WhenAll(tasks);
             _logger.LogInformation($"[DONE] Semua task branch untuk jadwal '{schedule.Sch_title}' selesai.");
+
+            // Logika Telegram Alert (Rekap vs Temuan Baru)
+            try
+            {
+                var now = DateTime.UtcNow.AddHours(7);
+                if (now.Hour == 0) 
+                {
+                    _logger.LogInformation($"INI RECAPPP");
+                    using var scope = _serviceProvider.CreateScope();
+                    var ctx = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+                    var openPorts = await ctx.HostPorts
+                        .Include(hp => hp.IpAddress)
+                        .ThenInclude(ip => ip.Branch)
+                        .Where(hp => branchIds.Contains(hp.IpAddress.Ip_branchId) && hp.Status == true)
+                        .AsNoTracking()
+                        .ToListAsync();
+
+                    if (openPorts.Any())
+                    {
+                        var msgBuilder = new StringBuilder();
+                        msgBuilder.AppendLine($"📅 <b>[DAILY RECAP] {schedule.Sch_title}</b>");
+                        msgBuilder.AppendLine("Daftar Host & Port Terbuka:\n");
+
+                        var grouped = openPorts.GroupBy(hp => hp.IpAddress.Branch.Branch_name);
+                        foreach (var g in grouped)
+                        {
+                            string branchHeader = $"🏢 <b>{g.Key}</b>";
+                            
+                            // Cek apakah muat untuk nulis nama Cabang
+                            if (msgBuilder.Length + branchHeader.Length > 3500)
+                            {
+                                await AlertController.SendAlertAsync(msgBuilder.ToString());
+                                msgBuilder.Clear();
+                            }
+                            msgBuilder.AppendLine(branchHeader);
+
+                            var ipGrouped = g.GroupBy(hp => hp.IpAddress.Ip_address);
+                            foreach (var ig in ipGrouped)
+                            {
+                                string portList = string.Join(", ", ig.Select(hp => hp.Port_number).OrderBy(p => p));
+                                string line = $"  🖥️ <code>{ig.Key}</code> : {portList}";
+
+                                // Cek apakah muat untuk nulis baris IP & Port ini
+                                if (msgBuilder.Length + line.Length > 3500)
+                                {
+                                    // Kalau udah kepanjangan, kirim dulu!
+                                    await AlertController.SendAlertAsync(msgBuilder.ToString());
+                                    msgBuilder.Clear();
+                                    
+                                    // Karena ini pesan baru, kita kasih tau lagi ini cabang yang mana (Biar user gak bingung)
+                                    msgBuilder.AppendLine($"🏢 <b>{g.Key} (Lanjutan)</b>");
+                                }
+                                msgBuilder.AppendLine(line);
+                            }
+                            msgBuilder.AppendLine(); // Kasih jarak enter antar cabang
+                        }
+                        
+                        // Terakhir, kirim sisa teks yang belum sempat terkirim di dalam loop
+                        if (msgBuilder.Length > 0 && msgBuilder.ToString().Trim() != "")
+                        {
+                            await AlertController.SendAlertAsync(msgBuilder.ToString());
+                        }
+                    }
+                }
+                else 
+                {
+                    if (allChanges.Any())
+                    {
+                        _logger.LogInformation($"INI ALERT PERUBAHANNN");
+                        var msgBuilder = new StringBuilder();
+                        msgBuilder.AppendLine($"⚠️ <b>[ALERT PERUBAHAN] {schedule.Sch_title}</b>");
+                        msgBuilder.AppendLine("Ditemukan perubahan status port:\n");
+
+                        var grouped = allChanges.GroupBy(c => c.BranchName);
+                        foreach (var g in grouped)
+                        {
+                            msgBuilder.AppendLine($"🏢 <b>{g.Key}</b>");
+                            foreach (var chg in g.OrderBy(c => c.IpAddress).ThenBy(c => c.PortNumber))
+                            {
+                                string statusIcon = chg.IsNowOpen ? "🔓 TERBUKA" : "🔒 TERTUTUP";
+                                string line = $"  • {chg.IpAddress} : Port {chg.PortNumber} -> {statusIcon}";
+                                
+                                if (msgBuilder.Length + line.Length > 3500) 
+                                {
+                                    await AlertController.SendAlertAsync(msgBuilder.ToString());
+                                    msgBuilder.Clear();
+                                }
+                                msgBuilder.AppendLine(line);
+                            }
+                            msgBuilder.AppendLine();
+                            
+                        }
+                        
+                        if (msgBuilder.Length > 0)
+                        {
+                            await AlertController.SendAlertAsync(msgBuilder.ToString());
+                            msgBuilder.AppendLine($"Terakhir dijalankan pada {schedule.Sch_lastRun}");
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Gagal mengirim notifikasi Telegram");
+            }
         }
 
         private void UpdateNextRun(Models.ScanSchedule schedule)
@@ -215,5 +344,13 @@ namespace portscanner_backend.Workers
             else if (schedule.Sch_frequency == "Once")
                 schedule.Sch_isActive = false;
         }
+    }
+
+    public class PortChangeAlertDto
+    {
+        public string BranchName { get; set; } = string.Empty;
+        public string IpAddress { get; set; } = string.Empty;
+        public int PortNumber { get; set; }
+        public bool IsNowOpen { get; set; }
     }
 }

@@ -68,7 +68,10 @@ namespace portscanner_backend.Controllers
 
             var portSeverities = await _context.PortMasters
                 .GroupBy(p => p.Pm_port_number)
-                .ToDictionaryAsync(g => g.Key, g => "Medium");
+                .ToDictionaryAsync(
+                    g => g.Key, 
+                    g => g.First().Pm_severity
+                );
 
             foreach (var host in scanResults)
             {
@@ -82,13 +85,39 @@ namespace portscanner_backend.Controllers
 
             if (scanResults.Any())
             {
-                await _scanService.BulkSaveResultsAsync(
+                var branchChanges = await _scanService.BulkSaveResultsAsync(
                     branch.Branch_id, 
                     scanResults, 
                     req.Title, 
                     "Manual Scan", 
                     null
                 );
+
+                if (branchChanges.Any())
+                {
+                    var msgBuilder = new System.Text.StringBuilder();
+                    msgBuilder.AppendLine($"⚡ <b>[MANUAL SCAN ALERT] {req.Title}</b>");
+                    msgBuilder.AppendLine($"🏢 <b>{branch.Branch_name}</b>");
+                    msgBuilder.AppendLine("Ditemukan perubahan status port:\n");
+
+                    foreach (var chg in branchChanges.OrderBy(c => c.IpAddress).ThenBy(c => c.PortNumber))
+                    {
+                        string statusIcon = chg.IsNowOpen ? "🔓 TERBUKA" : "🔒 TERTUTUP";
+                        string line = $"  • {chg.IpAddress} : Port {chg.PortNumber} -> {statusIcon}";
+                        
+                        if (msgBuilder.Length + line.Length > 3500) 
+                        {
+                            await AlertController.SendAlertAsync(msgBuilder.ToString());
+                            msgBuilder.Clear();
+                        }
+                        msgBuilder.AppendLine(line);
+                    }
+                    
+                    if (msgBuilder.Length > 0)
+                    {
+                        await AlertController.SendAlertAsync(msgBuilder.ToString());
+                    }
+                }
             }
 
             return Ok(new

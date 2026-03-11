@@ -16,6 +16,8 @@ namespace portscanner_backend.Models.Dto
         public string Branch_name { get; set; }
         public string Branch_cidr { get; set; }
         public int TotalHost { get; set; }
+        public int HostWithOpenPorts { get; set; }
+        public int HostWithNoOpenPorts { get; set; }
         public int TotalPortOpen { get; set; }
         public int TotalPortClosed { get; set; }
     }

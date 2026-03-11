@@ -71,5 +71,10 @@ namespace portscanner_backend.Models.Dto
         public string BranchCidr { get; set; }
     }
 
-    
+    public class PortStatusChange
+    {
+        public string IpAddress { get; set; } = string.Empty;
+        public int PortNumber { get; set; }
+        public bool IsNowOpen { get; set; }
+    }
 }

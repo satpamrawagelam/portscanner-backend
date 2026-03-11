@@ -159,8 +159,9 @@ namespace portscanner_backend.Services
                 .ToList();
         }
 
-        public async Task BulkSaveResultsAsync(int branchId, List<IpScanResultDto> results, string scanTitle, string scanType, int? schId = null)
+        public async Task<List<PortStatusChange>> BulkSaveResultsAsync(int branchId, List<IpScanResultDto> results, string scanTitle, string scanType, int? schId = null)
         {
+            var portChanges = new List<PortStatusChange>();
             var session = new ScanSession 
             {
                 Title = scanTitle,
@@ -242,11 +243,30 @@ namespace portscanner_backend.Services
 
                         if (currentHostPortsDict != null && currentHostPortsDict.TryGetValue(pNum, out var existingHp))
                         {
+                            if (existingHp.Status != portResult.Status)
+                            {
+                                portChanges.Add(new PortStatusChange
+                                {
+                                    IpAddress = ipResult.Ip,
+                                    PortNumber = pNum,
+                                    IsNowOpen = portResult.Status
+                                });
+                            }
+
                             existingHp.Status = portResult.Status;
                             existingHp.Last_Updated = session.ScanDate;
                         }
                         else
                         {
+                            // Jika sebelumnya port ini belum ada sama sekali di database,
+                            // maka dianggap sebagai perubahan jika status terbarunya adalah Open (true) atau Closed (false)
+                            portChanges.Add(new PortStatusChange
+                            {
+                                IpAddress = ipResult.Ip,
+                                PortNumber = pNum,
+                                IsNowOpen = portResult.Status
+                            });
+
                             var newHp = new HostPort
                             {
                                 Ip_id = ipEntity.Ip_id,
@@ -267,6 +287,8 @@ namespace portscanner_backend.Services
             }
 
             await _context.SaveChangesAsync();
+
+            return portChanges;
         }
     }
 }
