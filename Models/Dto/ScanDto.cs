@@ -2,7 +2,7 @@ namespace portscanner_backend.Models.Dto
 {
     public class ScanRequestDto
     {
-        public int Branch_id { get; set; }
+        public List<int> BranchIds { get; set; } = new List<int>();
 
         public int? Pg_id { get; set; }
 
@@ -35,14 +35,13 @@ namespace portscanner_backend.Models.Dto
         public string IpAddress { get; set; }
         public string OpenPorts { get; set; }
         public bool HostStatus { get; set; }
-        public int TotalRecords { get; set; }
     }
 
     public class ScheduleRequestDto
     {
         public string Sch_title { get; set; }
         public string Sch_frequency { get; set; }
-        public string Sch_time { get; set; } // Dari React String
+        public string Sch_time { get; set; }
         public string Sch_portMode { get; set; }
         public int? Sch_pgId { get; set; }
         public List<int>? Sch_targetManualPort { get; set; } 

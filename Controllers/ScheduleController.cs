@@ -34,7 +34,6 @@ namespace portscanner_backend.Controllers
             {
                 DateTime now = DateTime.UtcNow.AddHours(7); 
                 
-                // PERBAIKAN: Parse string time ke TimeSpan
                 TimeSpan parsedTime;
                 if (!TimeSpan.TryParse(req.Sch_time, out parsedTime))
                 {
@@ -42,17 +41,28 @@ namespace portscanner_backend.Controllers
                 }
 
                 DateTime todayRun = now.Date.Add(parsedTime);
+                DateTime nextRun = todayRun;
+                
+                if (todayRun <= now)
+                {
+                    if (req.Sch_frequency == "5 Minutes")
+                        nextRun = now.AddMinutes(5);
+                    else if (req.Sch_frequency == "Hourly")
+                        nextRun = now.AddHours(1);
+                    else
+                        nextRun = todayRun.AddDays(1);
+                }
 
                 var newSchedule = new ScanSchedule
                 {
                     Sch_title = req.Sch_title,
                     Sch_frequency = req.Sch_frequency,
-                    Sch_time = parsedTime, // Simpan sbg TimeSpan di Database
+                    Sch_time = parsedTime,
                     Sch_portMode = req.Sch_pgId == 0 ? "all" : req.Sch_portMode,
                     Sch_pgId = req.Sch_pgId == 0 ? null : (req.Sch_portMode == "all" ? null : req.Sch_pgId),
                     Sch_createdDate = now,
                     Sch_isActive = true,
-                    Sch_nextRun = todayRun > now ? todayRun : todayRun.AddDays(1)
+                    Sch_nextRun = nextRun
                 };
 
                 _context.ScanSchedules.Add(newSchedule);
@@ -70,7 +80,7 @@ namespace portscanner_backend.Controllers
 
                 if ((req.Sch_portMode == "Custom" || req.Sch_portMode == "single") && req.Sch_targetManualPort != null && req.Sch_targetManualPort.Any())
                 {
-                    // 1. Simpan string list-nya langsung di tabel ScanSchedule agar port custom tak terdaftar (unlisted) tidak hilang
+                    // 1. Simpan string list-nya langsung di tabel ScanSchedule agar port custom tak terdaftar tidak hilang
                     newSchedule.Sch_customPorts = string.Join(",", req.Sch_targetManualPort);
                     
                     // 2. Jika secara kebetulan ada Port tsb di PortMasters, buat relasinya jg untuk UI
@@ -184,7 +194,6 @@ namespace portscanner_backend.Controllers
             var schedule = await _context.ScanSchedules.FindAsync(id);
             if (schedule == null) return NotFound("Jadwal tidak ditemukan");
 
-            // PERBAIKAN: Parse string time ke TimeSpan
             TimeSpan parsedTime;
             if (!TimeSpan.TryParse(req.Sch_time, out parsedTime))
             {
@@ -193,13 +202,27 @@ namespace portscanner_backend.Controllers
 
             schedule.Sch_title = req.Sch_title;
             schedule.Sch_frequency = req.Sch_frequency;
-            schedule.Sch_time = parsedTime; // Simpan sbg TimeSpan
+            schedule.Sch_time = parsedTime;
             schedule.Sch_portMode = req.Sch_pgId == 0 ? "all" : req.Sch_portMode;
             schedule.Sch_pgId = req.Sch_pgId == 0 ? null : (req.Sch_portMode == "all" ? null : req.Sch_pgId);
 
             DateTime now = DateTime.UtcNow.AddHours(7);
             DateTime newRunTime = now.Date.Add(parsedTime);
-            schedule.Sch_nextRun = newRunTime > now ? newRunTime : newRunTime.AddDays(1);
+            DateTime nextRun = newRunTime;
+            
+            if (newRunTime <= now)
+            {
+                if (req.Sch_frequency == "5 Minutes")
+                    nextRun = now.AddMinutes(5);
+                else if (req.Sch_frequency == "Hourly")
+                    nextRun = now.AddHours(1);
+                else if (req.Sch_frequency == "Daily")
+                    nextRun = newRunTime.AddDays(1);
+                else if (req.Sch_frequency == "Weekly")
+                    nextRun = newRunTime.AddDays(7);
+            }
+
+            schedule.Sch_nextRun = nextRun;
 
             var oldTargets = _context.ScanScheduleTargets.Where(t => t.Tgt_schId == id);
             _context.ScanScheduleTargets.RemoveRange(oldTargets);

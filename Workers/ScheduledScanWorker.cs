@@ -157,6 +157,17 @@ namespace portscanner_backend.Workers
                     .ToListAsync();
             }
 
+            // Create a single session for this schedule run
+            int sessionId;
+            DateTime scanDate;
+            using (var scope = _serviceProvider.CreateScope())
+            {
+                var scopedScanService = scope.ServiceProvider.GetRequiredService<PortScanService>();
+                var sessionObj = await scopedScanService.CreateSessionAsync(schedule.Sch_title, "Scheduled Scan");
+                sessionId = sessionObj.Session_id;
+                scanDate = sessionObj.ScanDate;
+            }
+
             var tasks = new List<Task>();
             var allChanges = new ConcurrentBag<PortChangeAlertDto>();
 
@@ -194,8 +205,8 @@ namespace portscanner_backend.Workers
                                 var branchChanges = await scopedScanService.BulkSaveResultsAsync(
                                     currentBranch.Branch_id,
                                     scanResults,
-                                    schedule.Sch_title,
-                                    "Scheduled Scan",
+                                    sessionId,
+                                    scanDate,
                                     schedule.Sch_id
                                 );
 
@@ -335,7 +346,9 @@ namespace portscanner_backend.Workers
         {
             schedule.Sch_lastRun = DateTime.UtcNow.AddHours(7);
 
-            if (schedule.Sch_frequency == "Hourly")
+            if (schedule.Sch_frequency == "5 Minutes")
+                schedule.Sch_nextRun = schedule.Sch_nextRun?.AddMinutes(5);
+            else if (schedule.Sch_frequency == "Hourly")
                 schedule.Sch_nextRun = schedule.Sch_nextRun?.AddHours(1);
             else if (schedule.Sch_frequency == "Daily")
                 schedule.Sch_nextRun = schedule.Sch_nextRun?.AddDays(1);

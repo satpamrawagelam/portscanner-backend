@@ -30,6 +30,7 @@ builder.Services.AddScoped<DashboardService>();
 builder.Services.AddHostedService<ScheduledScanWorker>();
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddMemoryCache();
 builder.Services.AddSwaggerGen();
 
 var app = builder.Build();

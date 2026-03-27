@@ -2,92 +2,107 @@ using portscanner_backend.Models.Dto;
 using portscanner_backend.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Data.SqlClient;
+using Microsoft.Extensions.Caching.Memory;
 
 namespace portscanner_backend.Services
 {
     public class DashboardService
     {
         private readonly AppDbContext _context;
+        private readonly IMemoryCache _cache;
 
-        public DashboardService(AppDbContext context)
+        public DashboardService(AppDbContext context, IMemoryCache cache)
         {
             _context = context;
+            _cache = cache;
         }
 
         public async Task<DashboardPortStatusOverviewDto> GetPortStatusOverview()
         {
-            var result = await _context.DashboardOverviews
-                .FromSqlRaw("EXEC V2_sp_GetDashboardOverview")
-                .ToListAsync();
-
-            return result.FirstOrDefault() ?? new DashboardPortStatusOverviewDto();
+            return await _cache.GetOrCreateAsync("DashboardOverview", async entry =>
+            {
+                entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(5);
+                var result = await _context.DashboardOverviews
+                    .FromSqlRaw("EXEC V2_sp_GetDashboardOverview")
+                    .ToListAsync();
+                return result.FirstOrDefault() ?? new DashboardPortStatusOverviewDto();
+            });
         }
 
         public async Task<List<BranchHealthOverviewDto>> GetBranchHealthAsync()
         {
-            var result = await _context.BranchHealthOverviews
-                .FromSqlRaw("EXEC V2_sp_GetBranchHealth")
-                .ToListAsync();
-
-            return result;
+            return await _cache.GetOrCreateAsync("BranchHealth", async entry =>
+            {
+                entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(5);
+                return await _context.BranchHealthOverviews
+                    .FromSqlRaw("EXEC V2_sp_GetBranchHealth")
+                    .ToListAsync();
+            });
         }
 
         public async Task<BranchDetailDto?> GetBranchDetailAsync(int branchId)
         {
-            var rawData = await _context.BranchDetailRaws
-                .FromSqlRaw("EXEC V2_sp_GetBranchDetail @BranchId", new SqlParameter("@BranchId", branchId))
-                .ToListAsync();
-
-            if (!rawData.Any()) return null;
-
-            var result = new BranchDetailDto
+            return await _cache.GetOrCreateAsync($"BranchDetail_{branchId}", async entry =>
             {
-                BranchName = rawData.First().BranchName,
-                BranchCidr = rawData.First().BranchCidr,
-                TotalHost = rawData.Select(x => x.IpAddress).Distinct().Count()
-            };
+                entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(5);
+                var rawData = await _context.BranchDetailRaws
+                    .FromSqlRaw("EXEC V2_sp_GetBranchDetail @BranchId", new SqlParameter("@BranchId", branchId))
+                    .ToListAsync();
 
-            var grouped = rawData.GroupBy(x => x.IpAddress);
+                if (!rawData.Any()) return null;
 
-            foreach (var grp in grouped)
-            {
-                var firtsRow = grp.First();
-
-                var ipDto = new IpPortStatusDto
+                var result = new BranchDetailDto
                 {
-                    Ip = grp.Key,
-                    HostStatus = firtsRow.HostStatus,
-                    Ports = grp.Select(x => new PortStatusDto
-                    {
-                        Port = x.PortNumber,
-                        Service = x.ServiceName,
-                        Status = x.IsOpen,
-                        Severity = x.Severity
-                    }).OrderByDescending(p => p.Status).ThenBy(p => p.Port).ToList()
+                    BranchName = rawData.First().BranchName,
+                    BranchCidr = rawData.First().BranchCidr,
+                    TotalHost = rawData.Select(x => x.IpAddress).Distinct().Count()
                 };
-                result.Results.Add(ipDto);
-            }
-            return result;
+
+                var grouped = rawData.GroupBy(x => x.IpAddress);
+                foreach (var grp in grouped)
+                {
+                    var firstRow = grp.First();
+                    var ipDto = new IpPortStatusDto
+                    {
+                        Ip = grp.Key,
+                        HostStatus = firstRow.HostStatus,
+                        Ports = grp.Select(x => new PortStatusDto
+                        {
+                            Port = x.PortNumber,
+                            Service = x.ServiceName,
+                            Status = x.IsOpen,
+                            Severity = x.Severity
+                        }).OrderByDescending(p => p.Status).ThenBy(p => p.Port).ToList()
+                    };
+                    result.Results.Add(ipDto);
+                }
+                return result;
+            });
         }
 
         public async Task<List<GlobalTrendDto>> GetGlobalTrendAsync(int? month, int? year)
         {
-            var pMonth = new SqlParameter("@Month", month ?? DateTime.Now.Month);
-            var pYear = new SqlParameter("@Year", year ?? DateTime.Now.Year);
+            return await _cache.GetOrCreateAsync($"GlobalTrend_{month}_{year}", async entry =>
+            {
+                entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(5);
+                var pMonth = new SqlParameter("@Month", month ?? DateTime.Now.Month);
+                var pYear = new SqlParameter("@Year", year ?? DateTime.Now.Year);
 
-            var data = await _context.GlobalTrends
-                .FromSqlRaw("EXEC V2_sp_GetGlobalTrend @Month, @Year", pMonth, pYear)
-                .ToListAsync();
-
-            return data;
+                return await _context.GlobalTrends
+                    .FromSqlRaw("EXEC V2_sp_GetGlobalTrend @Month, @Year", pMonth, pYear)
+                    .ToListAsync();
+            });
         }
 
         public async Task<List<RiskDistributionDto>> GetRiskDistributionAsync()
         {
-            var data = await _context.RiskDistributions
-                .FromSqlRaw("EXEC V2_sp_GetRiskDistribution")
-                .ToListAsync();
-            return data;
+            return await _cache.GetOrCreateAsync("RiskDistribution", async entry =>
+            {
+                entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(5);
+                return await _context.RiskDistributions
+                    .FromSqlRaw("EXEC V2_sp_GetRiskDistribution")
+                    .ToListAsync();
+            });
         }
     }
 }

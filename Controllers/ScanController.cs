@@ -26,8 +26,11 @@ namespace portscanner_backend.Controllers
             if (string.IsNullOrWhiteSpace(req.Title)) 
                 return BadRequest("Judul Scan wajib diisi.");
 
-            var branch = await _context.Branches.FirstOrDefaultAsync(b => b.Branch_id == req.Branch_id);
-            if (branch == null) return BadRequest("Branch not found");
+            if (req.BranchIds == null || !req.BranchIds.Any())
+                return BadRequest("Branch wajib diisi.");
+
+            var branches = await _context.Branches.Where(b => req.BranchIds.Contains(b.Branch_id)).ToListAsync();
+            if (!branches.Any()) return BadRequest("Branch not found");
 
             var config = await _context.AppConfigs.FirstOrDefaultAsync() ?? new AppConfig 
             { 
@@ -61,11 +64,6 @@ namespace portscanner_backend.Controllers
 
             if (!portsToScan.Any()) return BadRequest("Tidak ada port yang ditemukan untuk discan.");
 
-            var scanResults = await _scanService.ExecuteSubnetScanAsync(
-                branch.Branch_cidr,
-                portsToScan
-            );
-
             var portSeverities = await _context.PortMasters
                 .GroupBy(p => p.Pm_port_number)
                 .ToDictionaryAsync(
@@ -73,67 +71,83 @@ namespace portscanner_backend.Controllers
                     g => g.First().Pm_severity
                 );
 
-            foreach (var host in scanResults)
-            {
-                foreach (var port in host.Ports)
-                {
-                    port.Severity = portSeverities.ContainsKey(port.Port) 
-                        ? portSeverities[port.Port] 
-                        : "Info";
-                }
-            }
+            var sessionObj = await _scanService.CreateSessionAsync(req.Title, "Manual Scan");
+            var allResults = new List<object>();
+            var allChanges = new List<PortStatusChange>();
 
-            if (scanResults.Any())
+            foreach (var branch in branches)
             {
-                var branchChanges = await _scanService.BulkSaveResultsAsync(
-                    branch.Branch_id, 
-                    scanResults, 
-                    req.Title, 
-                    "Manual Scan", 
-                    null
+                var scanResults = await _scanService.ExecuteSubnetScanAsync(
+                    branch.Branch_cidr,
+                    portsToScan
                 );
 
-                if (branchChanges.Any())
+                foreach (var host in scanResults)
                 {
-                    var msgBuilder = new System.Text.StringBuilder();
-                    msgBuilder.AppendLine($"⚡ <b>[MANUAL SCAN ALERT] {req.Title}</b>");
-                    msgBuilder.AppendLine($"🏢 <b>{branch.Branch_name}</b>");
-                    msgBuilder.AppendLine("Ditemukan perubahan status port:\n");
-
-                    foreach (var chg in branchChanges.OrderBy(c => c.IpAddress).ThenBy(c => c.PortNumber))
+                    foreach (var port in host.Ports)
                     {
-                        string statusIcon = chg.IsNowOpen ? "🔓 TERBUKA" : "🔒 TERTUTUP";
-                        string line = $"  • {chg.IpAddress} : Port {chg.PortNumber} -> {statusIcon}";
-                        
-                        if (msgBuilder.Length + line.Length > 3500) 
-                        {
-                            await AlertController.SendAlertAsync(msgBuilder.ToString());
-                            msgBuilder.Clear();
-                        }
-                        msgBuilder.AppendLine(line);
+                        port.Severity = portSeverities.ContainsKey(port.Port) 
+                            ? portSeverities[port.Port] 
+                            : "Info";
                     }
+                }
+
+                if (scanResults.Any())
+                {
+                    var branchChanges = await _scanService.BulkSaveResultsAsync(
+                        branch.Branch_id, 
+                        scanResults, 
+                        sessionObj.Session_id,
+                        sessionObj.ScanDate,
+                        null
+                    );
+
+                    allChanges.AddRange(branchChanges);
+                }
+
+                allResults.Add(new
+                {
+                    branchId = branch.Branch_id,
+                    branchName = branch.Branch_name,
+                    branchCidr = branch.Branch_cidr,
+                    summary = new 
+                    { 
+                        totalHosts = scanResults.Count, 
+                        aliveHosts = scanResults.Count(r => r.IsHostAlive),
+                        deadHosts = scanResults.Count(r => !r.IsHostAlive),
+                        totalOpenPorts = scanResults.Sum(r => r.Ports.Count(p => p.Status))
+                    },
+                    results = scanResults 
+                });
+            }
+
+            if (allChanges.Any())
+            {
+                var msgBuilder = new System.Text.StringBuilder();
+                msgBuilder.AppendLine($"⚡ <b>[MANUAL SCAN ALERT] {req.Title}</b>");
+                msgBuilder.AppendLine($"🏢 <b>Multi Branch ({branches.Count} Target)</b>");
+                msgBuilder.AppendLine("Ditemukan perubahan status port:\n");
+
+                foreach (var chg in allChanges.OrderBy(c => c.IpAddress).ThenBy(c => c.PortNumber))
+                {
+                    string statusIcon = chg.IsNowOpen ? "🔓 TERBUKA" : "🔒 TERTUTUP";
+                    string line = $"  • {chg.IpAddress} : Port {chg.PortNumber} -> {statusIcon}";
                     
-                    if (msgBuilder.Length > 0)
+                    if (msgBuilder.Length + line.Length > 3500) 
                     {
                         await AlertController.SendAlertAsync(msgBuilder.ToString());
+                        msgBuilder.Clear();
                     }
+                    msgBuilder.AppendLine(line);
+                }
+                
+                if (msgBuilder.Length > 0)
+                {
+                    await AlertController.SendAlertAsync(msgBuilder.ToString());
                 }
             }
 
-            return Ok(new
-            {
-                branchId = branch.Branch_id,
-                branchName = branch.Branch_name,
-                branchCidr = branch.Branch_cidr,
-                summary = new 
-                { 
-                    totalHosts = scanResults.Count, 
-                    aliveHosts = scanResults.Count(r => r.IsHostAlive),
-                    deadHosts = scanResults.Count(r => !r.IsHostAlive),
-                    totalOpenPorts = scanResults.Sum(r => r.Ports.Count(p => p.Status))
-                },
-                results = scanResults 
-            });
+            return Ok(allResults);
         }
     }
 }

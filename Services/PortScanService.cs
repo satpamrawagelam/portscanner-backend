@@ -159,9 +159,8 @@ namespace portscanner_backend.Services
                 .ToList();
         }
 
-        public async Task<List<PortStatusChange>> BulkSaveResultsAsync(int branchId, List<IpScanResultDto> results, string scanTitle, string scanType, int? schId = null)
+        public async Task<ScanSession> CreateSessionAsync(string scanTitle, string scanType)
         {
-            var portChanges = new List<PortStatusChange>();
             var session = new ScanSession 
             {
                 Title = scanTitle,
@@ -170,6 +169,13 @@ namespace portscanner_backend.Services
             };
             _context.ScanSessions.Add(session);
             await _context.SaveChangesAsync();
+            return session;
+        }
+
+        public async Task<List<PortStatusChange>> BulkSaveResultsAsync(int branchId, List<IpScanResultDto> results, int sessionId, DateTime scanDate, int? schId = null)
+        {
+            var portChanges = new List<PortStatusChange>();
+
 
             // Ganti lookup "semua port" ke versi longgar yg bisa nembus ke custom ports:
             // Krn 1 Nomor Port bisa ada di banyak group, Dictionary tidak bisa dipakai krn duplikat Key.
@@ -196,7 +202,7 @@ namespace portscanner_backend.Services
                         Ip_branchId = branchId,
                         Ip_address = ipResult.Ip,
                         Ip_isAlive = ipResult.IsHostAlive,
-                        Ip_lastScanned = session.ScanDate
+                        Ip_lastScanned = scanDate
                     };
                     _context.IpAddresses.Add(ipEntity);
                     ipDict[ipResult.Ip] = ipEntity;
@@ -204,7 +210,7 @@ namespace portscanner_backend.Services
                 else
                 {
                     ipEntity.Ip_isAlive = ipResult.IsHostAlive;
-                    ipEntity.Ip_lastScanned = session.ScanDate;
+                    ipEntity.Ip_lastScanned = scanDate;
                 }
             }
             await _context.SaveChangesAsync();
@@ -215,7 +221,7 @@ namespace portscanner_backend.Services
                 
                 var hostRes = new ScanHostResult
                 {
-                    Session_id = session.Session_id,
+                    Session_id = sessionId,
                     Ip_id = ipEntity.Ip_id,
                     IsAlive = ipResult.IsHostAlive
                 };
@@ -228,8 +234,6 @@ namespace portscanner_backend.Services
                     foreach (var portResult in ipResult.Ports)
                     {
                         var pNum = portResult.Port;
-                        
-                        // HAPUS syarat "harus terdaftar di PortMaster" (allPorts) krn manual/custom port diperbolehkan:
                         
                         if (portResult.Status)
                         {
@@ -254,7 +258,7 @@ namespace portscanner_backend.Services
                             }
 
                             existingHp.Status = portResult.Status;
-                            existingHp.Last_Updated = session.ScanDate;
+                            existingHp.Last_Updated = scanDate;
                         }
                         else
                         {
@@ -272,7 +276,7 @@ namespace portscanner_backend.Services
                                 Ip_id = ipEntity.Ip_id,
                                 Port_number = pNum,
                                 Status = portResult.Status,
-                                Last_Updated = session.ScanDate
+                                Last_Updated = scanDate
                             };
                             _context.HostPorts.Add(newHp);
                             if (currentHostPortsDict == null)
