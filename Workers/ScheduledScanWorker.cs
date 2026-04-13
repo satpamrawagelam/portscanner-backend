@@ -303,35 +303,56 @@ namespace portscanner_backend.Workers
                 {
                     if (allChanges.Any())
                     {
-                        _logger.LogInformation($"INI ALERT PERUBAHANNN");
-                        var msgBuilder = new StringBuilder();
-                        msgBuilder.AppendLine($"⚠️ <b>[ALERT PERUBAHAN] {schedule.Sch_title}</b>");
-                        msgBuilder.AppendLine("Ditemukan perubahan status port:\n");
+                        _logger.LogInformation($"INI ALERT PERUBAHANNN (RECAP FORMAT)");
+                        using var scope = _serviceProvider.CreateScope();
+                        var ctx = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-                        var grouped = allChanges.GroupBy(c => c.BranchName);
-                        foreach (var g in grouped)
+                        var openPorts = await ctx.HostPorts
+                            .Include(hp => hp.IpAddress)
+                            .ThenInclude(ip => ip.Branch)
+                            .Where(hp => branchIds.Contains(hp.IpAddress.Ip_branchId) && hp.Status == true)
+                            .AsNoTracking()
+                            .ToListAsync();
+
+                        if (openPorts.Any())
                         {
-                            msgBuilder.AppendLine($"🏢 <b>{g.Key}</b>");
-                            foreach (var chg in g.OrderBy(c => c.IpAddress).ThenBy(c => c.PortNumber))
+                            var msgBuilder = new StringBuilder();
+                            msgBuilder.AppendLine($"⚠️ <b>[ALERT PERUBAHAN] {schedule.Sch_title}</b>");
+                            msgBuilder.AppendLine("Daftar Host & Port Terbuka saat ini:\n");
+
+                            var grouped = openPorts.GroupBy(hp => hp.IpAddress.Branch.Branch_name);
+                            foreach (var g in grouped)
                             {
-                                string statusIcon = chg.IsNowOpen ? "🔓 TERBUKA" : "🔒 TERTUTUP";
-                                string line = $"  • {chg.IpAddress} : Port {chg.PortNumber} -> {statusIcon}";
-                                
-                                if (msgBuilder.Length + line.Length > 3500) 
+                                string branchHeader = $"🏢 <b>{g.Key}</b>";
+                                if (msgBuilder.Length + branchHeader.Length > 3500)
                                 {
                                     await AlertController.SendAlertAsync(msgBuilder.ToString());
                                     msgBuilder.Clear();
                                 }
-                                msgBuilder.AppendLine(line);
+                                msgBuilder.AppendLine(branchHeader);
+
+                                var ipGrouped = g.GroupBy(hp => hp.IpAddress.Ip_address);
+                                foreach (var ig in ipGrouped)
+                                {
+                                    string portList = string.Join(", ", ig.Select(hp => hp.Port_number).OrderBy(p => p));
+                                    string line = $"  🖥️ <code>{ig.Key}</code> : {portList}";
+
+                                    if (msgBuilder.Length + line.Length > 3500)
+                                    {
+                                        await AlertController.SendAlertAsync(msgBuilder.ToString());
+                                        msgBuilder.Clear();
+                                        msgBuilder.AppendLine($"🏢 <b>{g.Key} (Lanjutan)</b>");
+                                    }
+                                    msgBuilder.AppendLine(line);
+                                }
+                                msgBuilder.AppendLine();
                             }
-                            msgBuilder.AppendLine();
                             
-                        }
-                        
-                        if (msgBuilder.Length > 0)
-                        {
-                            await AlertController.SendAlertAsync(msgBuilder.ToString());
-                            msgBuilder.AppendLine($"Terakhir dijalankan pada {schedule.Sch_lastRun}");
+                            if (msgBuilder.Length > 0 && msgBuilder.ToString().Trim() != "")
+                            {
+                                msgBuilder.AppendLine($"\nTerakhir dijalankan pada {schedule.Sch_lastRun}");
+                                await AlertController.SendAlertAsync(msgBuilder.ToString());
+                            }
                         }
                     }
                 }

@@ -123,27 +123,51 @@ namespace portscanner_backend.Controllers
 
             if (allChanges.Any())
             {
-                var msgBuilder = new System.Text.StringBuilder();
-                msgBuilder.AppendLine($"⚡ <b>[MANUAL SCAN ALERT] {req.Title}</b>");
-                msgBuilder.AppendLine($"🏢 <b>Multi Branch ({branches.Count} Target)</b>");
-                msgBuilder.AppendLine("Ditemukan perubahan status port:\n");
+                var openPorts = await _context.HostPorts
+                    .Include(hp => hp.IpAddress)
+                    .ThenInclude(ip => ip.Branch)
+                    .Where(hp => req.BranchIds.Contains(hp.IpAddress.Ip_branchId) && hp.Status == true)
+                    .AsNoTracking()
+                    .ToListAsync();
 
-                foreach (var chg in allChanges.OrderBy(c => c.IpAddress).ThenBy(c => c.PortNumber))
+                if (openPorts.Any())
                 {
-                    string statusIcon = chg.IsNowOpen ? "🔓 TERBUKA" : "🔒 TERTUTUP";
-                    string line = $"  • {chg.IpAddress} : Port {chg.PortNumber} -> {statusIcon}";
-                    
-                    if (msgBuilder.Length + line.Length > 3500) 
+                    var msgBuilder = new System.Text.StringBuilder();
+                    msgBuilder.AppendLine($"⚡ <b>[MANUAL SCAN ALERT] {req.Title}</b>");
+                    msgBuilder.AppendLine("Daftar Host & Port Terbuka:\n");
+
+                    var grouped = openPorts.GroupBy(hp => hp.IpAddress.Branch.Branch_name);
+                    foreach (var g in grouped)
+                    {
+                        string branchHeader = $"🏢 <b>{g.Key}</b>";
+                        if (msgBuilder.Length + branchHeader.Length > 3500)
+                        {
+                            await AlertController.SendAlertAsync(msgBuilder.ToString());
+                            msgBuilder.Clear();
+                        }
+                        msgBuilder.AppendLine(branchHeader);
+
+                        var ipGrouped = g.GroupBy(hp => hp.IpAddress.Ip_address);
+                        foreach (var ig in ipGrouped)
+                        {
+                            string portList = string.Join(", ", ig.Select(hp => hp.Port_number).OrderBy(p => p));
+                            string line = $"  🖥️ <code>{ig.Key}</code> : {portList}";
+
+                            if (msgBuilder.Length + line.Length > 3500)
+                            {
+                                await AlertController.SendAlertAsync(msgBuilder.ToString());
+                                msgBuilder.Clear();
+                                msgBuilder.AppendLine($"🏢 <b>{g.Key} (Lanjutan)</b>");
+                            }
+                            msgBuilder.AppendLine(line);
+                        }
+                        msgBuilder.AppendLine();
+                    }
+
+                    if (msgBuilder.Length > 0 && msgBuilder.ToString().Trim() != "")
                     {
                         await AlertController.SendAlertAsync(msgBuilder.ToString());
-                        msgBuilder.Clear();
                     }
-                    msgBuilder.AppendLine(line);
-                }
-                
-                if (msgBuilder.Length > 0)
-                {
-                    await AlertController.SendAlertAsync(msgBuilder.ToString());
                 }
             }
 

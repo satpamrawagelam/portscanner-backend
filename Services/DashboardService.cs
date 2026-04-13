@@ -42,42 +42,39 @@ namespace portscanner_backend.Services
 
         public async Task<BranchDetailDto?> GetBranchDetailAsync(int branchId)
         {
-            return await _cache.GetOrCreateAsync($"BranchDetail_{branchId}", async entry =>
+            var rawData = await _context.BranchDetailRaws
+                .FromSqlRaw("EXEC V2_sp_GetBranchDetail @BranchId", new SqlParameter("@BranchId", branchId))
+                .ToListAsync();
+
+            if (!rawData.Any()) return null;
+
+            var result = new BranchDetailDto
             {
-                entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(5);
-                var rawData = await _context.BranchDetailRaws
-                    .FromSqlRaw("EXEC V2_sp_GetBranchDetail @BranchId", new SqlParameter("@BranchId", branchId))
-                    .ToListAsync();
+                BranchName = rawData.First().BranchName,
+                BranchCidr = rawData.First().BranchCidr,
+                TotalHost = rawData.Select(x => x.IpAddress).Distinct().Count()
+            };
 
-                if (!rawData.Any()) return null;
-
-                var result = new BranchDetailDto
+            var grouped = rawData.GroupBy(x => x.IpAddress);
+            foreach (var grp in grouped)
+            {
+                var firstRow = grp.First();
+                var ipDto = new IpPortStatusDto
                 {
-                    BranchName = rawData.First().BranchName,
-                    BranchCidr = rawData.First().BranchCidr,
-                    TotalHost = rawData.Select(x => x.IpAddress).Distinct().Count()
-                };
-
-                var grouped = rawData.GroupBy(x => x.IpAddress);
-                foreach (var grp in grouped)
-                {
-                    var firstRow = grp.First();
-                    var ipDto = new IpPortStatusDto
+                    Ip = grp.Key,
+                    HostStatus = firstRow.HostStatus,
+                    Ports = grp.Select(x => new PortStatusDto
                     {
-                        Ip = grp.Key,
-                        HostStatus = firstRow.HostStatus,
-                        Ports = grp.Select(x => new PortStatusDto
-                        {
-                            Port = x.PortNumber,
-                            Service = x.ServiceName,
-                            Status = x.IsOpen,
-                            Severity = x.Severity
-                        }).OrderByDescending(p => p.Status).ThenBy(p => p.Port).ToList()
-                    };
-                    result.Results.Add(ipDto);
-                }
-                return result;
-            });
+                        Port = x.PortNumber,
+                        Service = x.ServiceName,
+                        Status = x.IsOpen,
+                        IsWhitelisted = x.IsWhitelisted,
+                        Severity = x.Severity
+                    }).OrderByDescending(p => p.Status).ThenBy(p => p.Port).ToList()
+                };
+                result.Results.Add(ipDto);
+            }
+            return result;
         }
 
         public async Task<List<GlobalTrendDto>> GetGlobalTrendAsync(int? month, int? year)

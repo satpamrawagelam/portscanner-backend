@@ -11,6 +11,7 @@ namespace portscanner_backend.Models
         public int Ip_id { get; set; }
         public int Port_number { get; set; }
         public bool Status { get; set; }
+        public bool IsWhitelisted { get; set; }
         public DateTime Last_Updated { get; set; } = DateTime.UtcNow;
 
         [ForeignKey(nameof(Ip_id))]

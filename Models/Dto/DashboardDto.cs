@@ -45,6 +45,7 @@ namespace portscanner_backend.Models.Dto
         public int? Port { get; set; }
         public string Service { get; set; } = string.Empty;
         public bool? Status { get; set; } 
+        public bool IsWhitelisted { get; set; }
         public string Severity { get; set; }
     }
 
@@ -59,6 +60,7 @@ namespace portscanner_backend.Models.Dto
         public bool IsOpen { get; set; }
         public string Severity { get; set; }
         public bool HostStatus { get; set; }
+        public bool IsWhitelisted { get; set; }
     }
 
     
