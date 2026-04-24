@@ -369,6 +369,8 @@ namespace portscanner_backend.Workers
 
             if (schedule.Sch_frequency == "5 Minutes")
                 schedule.Sch_nextRun = schedule.Sch_nextRun?.AddMinutes(5);
+            else if (schedule.Sch_frequency == "20 Minutes")
+                schedule.Sch_nextRun = schedule.Sch_nextRun?.AddMinutes(20);
             else if (schedule.Sch_frequency == "Hourly")
                 schedule.Sch_nextRun = schedule.Sch_nextRun?.AddHours(1);
             else if (schedule.Sch_frequency == "Daily")

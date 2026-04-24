@@ -47,6 +47,8 @@ namespace portscanner_backend.Controllers
                 {
                     if (req.Sch_frequency == "5 Minutes")
                         nextRun = now.AddMinutes(5);
+                    else if (req.Sch_frequency == "20 Minutes")
+                        nextRun = now.AddMinutes(20);
                     else if (req.Sch_frequency == "Hourly")
                         nextRun = now.AddHours(1);
                     else
@@ -214,6 +216,8 @@ namespace portscanner_backend.Controllers
             {
                 if (req.Sch_frequency == "5 Minutes")
                     nextRun = now.AddMinutes(5);
+                else if (req.Sch_frequency == "20 Minutes")
+                    nextRun = now.AddMinutes(20);
                 else if (req.Sch_frequency == "Hourly")
                     nextRun = now.AddHours(1);
                 else if (req.Sch_frequency == "Daily")
