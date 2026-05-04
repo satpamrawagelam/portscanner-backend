@@ -23,6 +23,13 @@ namespace portscanner_backend.Controllers
         }
 
         [HttpGet]
+        public async Task<IActionResult> GetOverviewHost()
+        {
+            var data = await _service.GetPortStatusOverviewHost();
+            return Ok(data);
+        }
+
+        [HttpGet]
         public async Task<IActionResult> GetBranchHealth()
         {
             var data = await _service.GetBranchHealthAsync();

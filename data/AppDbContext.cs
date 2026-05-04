@@ -24,6 +24,7 @@ namespace portscanner_backend.Data
         public DbSet<ScanPortResult> ScanPortResults { get; set; }
 
         public DbSet<DashboardPortStatusOverviewDto> DashboardOverviews { get; set; }
+        public DbSet<DashboardPortStatusOverviewDtoHost> DashboardOverviewsHost { get; set; }
         public DbSet<BranchHealthOverviewDto> BranchHealthOverviews { get; set; }
         public DbSet<BranchDetailRawDto> BranchDetailRaws { get; set; }
         public DbSet<GlobalTrendDto> GlobalTrends { get; set; }
@@ -59,6 +60,7 @@ namespace portscanner_backend.Data
             modelBuilder.Entity<GlobalTrendDto>().HasNoKey();
             modelBuilder.Entity<RiskDistributionDto>().HasNoKey();
             modelBuilder.Entity<ScanHistoryDto>().HasNoKey();
+            modelBuilder.Entity<DashboardPortStatusOverviewDtoHost>().HasNoKey();
         }
     }
 }

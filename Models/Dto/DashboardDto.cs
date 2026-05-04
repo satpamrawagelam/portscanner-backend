@@ -10,6 +10,13 @@ namespace portscanner_backend.Models.Dto
         public int Closed { get; set; }
     }
 
+    public class DashboardPortStatusOverviewDtoHost
+    {
+        public int Total { get; set; }
+        public int VulnHost { get; set; }
+        public int SafeHost { get; set; }
+    }
+
     public class BranchHealthOverviewDto
     {
         public int Branch_id { get; set; }

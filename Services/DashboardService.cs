@@ -29,6 +29,19 @@ namespace portscanner_backend.Services
             });
         }
 
+        public async Task<DashboardPortStatusOverviewDtoHost> GetPortStatusOverviewHost()
+        {
+            return await _cache.GetOrCreateAsync("DashboardOverviewHost", async entry =>
+            {
+                entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromMinutes(5);
+                var result = await _context.DashboardOverviewsHost
+                    .FromSqlRaw("EXEC V2_sp_GetDashboardOverviewHost")
+                    .ToListAsync();
+                return result.FirstOrDefault() ?? new DashboardPortStatusOverviewDtoHost();
+            });
+        }
+
+
         public async Task<List<BranchHealthOverviewDto>> GetBranchHealthAsync()
         {
             return await _cache.GetOrCreateAsync("BranchHealth", async entry =>
