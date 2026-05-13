@@ -27,11 +27,20 @@ builder.Services.AddCors(options =>
 builder.Services.AddControllers();
 builder.Services.AddScoped<PortScanService>();
 builder.Services.AddScoped<DashboardService>();
+builder.Services.AddScoped<ReportGeneratorService>();
 builder.Services.AddHostedService<ScheduledScanWorker>();
+builder.Services.AddHostedService<ReportSchedulerService>();
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddMemoryCache();
 builder.Services.AddSwaggerGen();
+
+// Ensure wwwroot/reports exists so UseStaticFiles works even on first run
+var webRootPath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot");
+if (!Directory.Exists(Path.Combine(webRootPath, "reports")))
+{
+    Directory.CreateDirectory(Path.Combine(webRootPath, "reports"));
+}
 
 var app = builder.Build();
 
@@ -45,6 +54,7 @@ if (app.Environment.IsDevelopment())
 // app.UseHttpsRedirection();
 
 app.UseCors("AllowReactApp");
+app.UseStaticFiles(); // Enable serving PDF files from wwwroot
 
 app.UseAuthorization();
 

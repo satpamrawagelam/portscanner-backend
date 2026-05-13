@@ -37,6 +37,7 @@ namespace portscanner_backend.Models.Dto
         public bool HostStatus { get; set; }
     }
 
+
     public class ScheduleRequestDto
     {
         public string Sch_title { get; set; }
@@ -76,4 +77,49 @@ namespace portscanner_backend.Models.Dto
         public int PortNumber { get; set; }
         public bool IsNowOpen { get; set; }
     }
-}
+
+    // ── PDF Report DTOs ──────────────────────────────────────────────────────
+
+    public class ScanReportSummaryDto
+    {
+        public int TotalScan { get; set; }
+        public int TotalOpenPortFindings { get; set; }
+        public int TotalHostWithOpenPort { get; set; }
+        public int HighSeverityPortCount { get; set; }
+        public int MediumSeverityPortCount { get; set; }
+    }
+
+    public class TopBranchReportDto
+    {
+        public string BranchName { get; set; } = string.Empty;
+        public int OpenPortCount { get; set; }
+        public int RiskScore { get; set; }
+    }
+
+    public class TopHostReportDto
+    {
+        public string IpAddress { get; set; } = string.Empty;
+        public string BranchName { get; set; } = string.Empty;
+        public int OpenPortCount { get; set; }
+        public int RiskScore { get; set; }
+    }
+
+    public class TopPortReportDto
+    {
+        public int PortNumber { get; set; }
+        public string Severity { get; set; } = string.Empty;
+        public string PortDesc { get; set; } = string.Empty;
+        public int OpenCount { get; set; }
+    }
+
+    public class ScanReportResponseDto
+    {
+        public string PeriodeStart { get; set; } = string.Empty;
+        public string PeriodeEnd { get; set; } = string.Empty;
+        public ScanReportSummaryDto Summary { get; set; } = new();
+        public List<TopBranchReportDto> TopBranches { get; set; } = new();
+        public List<TopHostReportDto> TopHosts { get; set; } = new();
+        public List<TopPortReportDto> TopPorts { get; set; } = new();
+        public List<ScanHistoryDto> DetailHistory { get; set; } = new();
+    }
+}

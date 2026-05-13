@@ -1,12 +1,20 @@
 {
   "Version": 1,
-  "Hash": "YJ5mkCDEWJCTw90abRqkkjJho/B+pJ1appDMyTVjC8I=",
+  "Hash": "a11DCsN5CgfLPGGYD1ua9E+fVrjVFtFwipJcibntnCc=",
   "Source": "portscanner-backend",
   "BasePath": "_content/portscanner-backend",
   "Mode": "Default",
   "ManifestType": "Build",
   "ReferencedProjectsConfiguration": [],
-  "DiscoveryPatterns": [],
+  "DiscoveryPatterns": [
+    {
+      "Name": "portscanner-backend\\wwwroot",
+      "Source": "portscanner-backend",
+      "ContentRoot": "D:\\MAGANG\\PAMA\\Project\\EEC New Schema\\portscanner-backend\\wwwroot\\",
+      "BasePath": "_content/portscanner-backend",
+      "Pattern": "**"
+    }
+  ],
   "Assets": [],
   "Endpoints": []
 }
