@@ -70,6 +70,8 @@ namespace portscanner_backend.Data
             modelBuilder.Entity<CheckPortByHostDto>().HasNoKey();
             modelBuilder.Entity<CheckPortByBranchDto>().HasNoKey();
             modelBuilder.Entity<CheckPortByBranchRawDto>().HasNoKey();
+            modelBuilder.Entity<SpesificPortStatusDto>().HasNoKey();
+            modelBuilder.Entity<SpesificPortRequestDto>().HasNoKey();
         }
     }
 }

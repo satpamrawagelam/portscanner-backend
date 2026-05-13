@@ -46,7 +46,7 @@ namespace portscanner_backend.Controllers
                 .FromSqlRaw("EXEC V2_sp_CheckPortByBranch @BranchName", Branch)
                 .ToListAsync();
 
-            if (data == null) return NotFound("Branch not found or no scan data");
+            if (data == null || !data.Any()) return Ok("Branch not found or no scan data");
 
             var headerData = data.First();
 
@@ -64,6 +64,38 @@ namespace portscanner_backend.Controllers
             };
             
             return Ok(finalResult);
+        }
+
+        [HttpGet("status")] 
+        public async Task<IActionResult> CheckSpesificPortAndHost([FromQuery] SpesificPortRequestDto req)
+        {
+            if (string.IsNullOrWhiteSpace(req.Ip) || string.IsNullOrWhiteSpace(req.Ports))
+            {
+                return Ok(new { text = "⚠️ *Format perintah tidak lengkap!*\nContoh penggunaan: `/status 10.10.10.10 80,443`" });
+            }
+
+            if (!IPAddress.TryParse(req.Ip, out _))
+            {
+                return Ok(new { text = "⚠️ *Format IP Address tidak valid!*\nContoh: `/status 10.10.10.10 80,443`" });
+            }
+            
+            try
+            {
+                var data = await _context.Set<SpesificPortStatusDto>()
+                    .FromSqlInterpolated($"EXEC V2_sp_CheckSpesificPortAndHost @IpAddress = {req.Ip}, @Ports = {req.Ports}")
+                    .ToListAsync();
+
+                if (data == null || !data.Any())
+                {
+                    return Ok(new { text = $"⚠️ *IP {req.Ip} tidak ditemukan terdaftar di database!*" });
+                }
+
+                return Ok(new { results = data });
+            }
+            catch (Exception ex)
+            {
+                return Ok(new { text = "⚠️ *Terjadi kesalahan pada server saat menarik data.*" });
+            }
         }
     }
 }
