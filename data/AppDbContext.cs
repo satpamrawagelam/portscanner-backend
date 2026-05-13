@@ -22,6 +22,7 @@ namespace portscanner_backend.Data
         public DbSet<ScanSession> ScanSessions { get; set; }
         public DbSet<ScanHostResult> ScanHostResults { get; set; }
         public DbSet<ScanPortResult> ScanPortResults { get; set; }
+        public DbSet<GeneratedReport> GeneratedReports { get; set; }
 
         public DbSet<DashboardPortStatusOverviewDto> DashboardOverviews { get; set; }
         public DbSet<DashboardPortStatusOverviewDtoHost> DashboardOverviewsHost { get; set; }
@@ -30,6 +31,11 @@ namespace portscanner_backend.Data
         public DbSet<GlobalTrendDto> GlobalTrends { get; set; }
         public DbSet<RiskDistributionDto> RiskDistributions { get; set; }
         public DbSet<ScanHistoryDto> ScanHistoryLogs { get; set; }
+
+        public DbSet<CheckPortByHostDto> CheckPortByHostDtos { get; set; }
+        public DbSet<CheckPortByBranchDto> CheckPortByBranchDtos { get; set; }
+        public DbSet<CheckPortByBranchRawDto> CheckPortByBranchRawDtos { get; set; }
+
 
         
         
@@ -61,6 +67,9 @@ namespace portscanner_backend.Data
             modelBuilder.Entity<RiskDistributionDto>().HasNoKey();
             modelBuilder.Entity<ScanHistoryDto>().HasNoKey();
             modelBuilder.Entity<DashboardPortStatusOverviewDtoHost>().HasNoKey();
+            modelBuilder.Entity<CheckPortByHostDto>().HasNoKey();
+            modelBuilder.Entity<CheckPortByBranchDto>().HasNoKey();
+            modelBuilder.Entity<CheckPortByBranchRawDto>().HasNoKey();
         }
     }
 }
