@@ -59,14 +59,15 @@ namespace portscanner_backend.Controllers
                 {
                     IpAddress = row.IpAddress,
                     HostStatus = row.HostStatus,
-                    Port_number = string.IsNullOrWhiteSpace(row.Port_number) ? "-" : row.Port_number 
+                    Port_number = string.IsNullOrWhiteSpace(row.Port_number) ? "-" : row.Port_number,
+                    LastScanned = row.LastScanned
                 }).ToList()
             };
             
             return Ok(finalResult);
         }
 
-        [HttpGet("status")] 
+        [HttpGet("")] 
         public async Task<IActionResult> CheckSpesificPortAndHost([FromQuery] SpesificPortRequestDto req)
         {
             if (string.IsNullOrWhiteSpace(req.Ip) || string.IsNullOrWhiteSpace(req.Ports))
@@ -91,6 +92,84 @@ namespace portscanner_backend.Controllers
                 }
 
                 return Ok(new { results = data });
+            }
+            catch (Exception ex)
+            {
+                return Ok(new { text = "⚠️ *Terjadi kesalahan pada server saat menarik data.*" });
+            }
+        }
+
+        [HttpGet("")]
+        public async Task<IActionResult> CheckSpesificPortBySegment([FromQuery] SegmentPortRequestDto req)
+        {
+            if (string.IsNullOrWhiteSpace(req.Cidr) || string.IsNullOrWhiteSpace(req.Ports))
+            {
+                return Ok(new { text = "⚠️ *Format perintah tidak lengkap!*\nContoh: `/check 10.10.10.0/28 20,443`" });
+            }
+
+            try
+            {
+                var data = await _context.Set<SegmentPortRawDto>()
+                    .FromSqlInterpolated($"EXEC V2_sp_CheckSpesificPortBySegment @Cidr = {req.Cidr}, @Ports = {req.Ports}")
+                    .ToListAsync();
+
+                if (data == null || !data.Any())
+                {
+                    return Ok(new { text = $"⚠️ *Segmen IP {req.Cidr} tidak ditemukan di database!*" });
+                }
+
+                var finalResult = new
+                {
+                    cidr = req.Cidr,
+                    results = data.Select(row => new 
+                    {
+                        ipAddress = row.IpAddress,
+                        hostStatus = row.HostStatus,
+                        openPorts = string.IsNullOrWhiteSpace(row.OpenPorts) ? "-" : row.OpenPorts,
+                        lastScanned = row.LastScanned
+                    }).ToList()
+                };
+
+                return Ok(finalResult);
+            }
+            catch (Exception ex)
+            {
+                return Ok(new { text = "⚠️ *Terjadi kesalahan pada server saat menarik data.*" });
+            }
+        }
+
+        [HttpGet("")]
+        public async Task<IActionResult> CheckHostsBySpesificPorts([FromQuery] CheckPortsRequestDto req)
+        {
+            if (string.IsNullOrWhiteSpace(req.Ports))
+            {
+                return Ok(new { text = "⚠️ *Format perintah tidak lengkap!*\nContoh: `/CP 80,443`" });
+            }
+
+            try
+            {
+                var data = await _context.Set<SegmentPortRawDto>()
+                    .FromSqlInterpolated($"EXEC V2_sp_CheckHostsBySpesificPorts @Ports = {req.Ports}")
+                    .ToListAsync();
+
+                if (data == null || !data.Any())
+                {
+                    return Ok(new { text = $"✅ *Aman!* Tidak ditemukan host yang memiliki port {req.Ports} dalam keadaan terbuka." });
+                }
+
+                var finalResult = new
+                {
+                    portsRequested = req.Ports,
+                    results = data.Select(row => new 
+                    {
+                        ipAddress = row.IpAddress,
+                        hostStatus = row.HostStatus,
+                        openPorts = row.OpenPorts,
+                        lastScanned = row.LastScanned
+                    }).ToList()
+                };
+
+                return Ok(finalResult);
             }
             catch (Exception ex)
             {
