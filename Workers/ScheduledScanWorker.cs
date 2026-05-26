@@ -66,7 +66,7 @@ namespace portscanner_backend.Workers
             var config = await context.AppConfigs.FirstOrDefaultAsync() ?? new AppConfig
             {
                 MaxConcurrency = 50,
-                PingTimeout = 1000,
+                PingTimeout = 3000,
                 PortScanTimeout = 1000
             };
 
@@ -153,7 +153,7 @@ namespace portscanner_backend.Workers
                 var tmpContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
                 branches = await tmpContext.Branches
                     .Where(b => branchIds.Contains(b.Branch_id))
-                    .AsNoTracking() // Penting: AsNoTracking biar enteng
+                    .AsNoTracking()
                     .ToListAsync();
             }
 

@@ -122,4 +122,21 @@ namespace portscanner_backend.Models.Dto
         public List<TopPortReportDto> TopPorts { get; set; } = new();
         public List<ScanHistoryDto> DetailHistory { get; set; } = new();
     }
+
+    public class BranchScanSummaryDto
+    {
+        public int TotalHosts { get; set; }
+        public int AliveHosts { get; set; }
+        public int DeadHosts { get; set; }
+        public int TotalOpenPorts { get; set; }
+    }
+
+    public class BranchScanResultResponse
+    {
+        public int BranchId { get; set; }
+        public string BranchName { get; set; } = string.Empty;
+        public string BranchCidr { get; set; } = string.Empty;
+        public BranchScanSummaryDto Summary { get; set; } = new();
+        public List<IpScanResultDto> Results { get; set; } = new();
+    }
 }

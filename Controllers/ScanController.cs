@@ -4,6 +4,7 @@ using portscanner_backend.Data;
 using portscanner_backend.Models;
 using portscanner_backend.Models.Dto;
 using portscanner_backend.Services;
+using System.Collections.Concurrent;
 
 namespace portscanner_backend.Controllers
 {
@@ -13,11 +14,13 @@ namespace portscanner_backend.Controllers
     {
         private readonly AppDbContext _context;
         private readonly PortScanService _scanService;
+        private readonly IServiceProvider _serviceProvider;
 
-        public ScanController(AppDbContext context, PortScanService scanService)
+        public ScanController(AppDbContext context, PortScanService scanService, IServiceProvider serviceProvider)
         {
             _context = context;
             _scanService = scanService;
+            _serviceProvider = serviceProvider;
         }
 
         [HttpPost]
@@ -72,54 +75,70 @@ namespace portscanner_backend.Controllers
                 );
 
             var sessionObj = await _scanService.CreateSessionAsync(req.Title, "Manual Scan");
-            var allResults = new List<object>();
-            var allChanges = new List<PortStatusChange>();
+            var allResults = new ConcurrentBag<BranchScanResultResponse>();
+            var allChanges = new ConcurrentBag<PortStatusChange>();
+
+            var tasks = new List<Task>();
 
             foreach (var branch in branches)
             {
-                var scanResults = await _scanService.ExecuteSubnetScanAsync(
-                    branch.Branch_cidr,
-                    portsToScan
-                );
-
-                foreach (var host in scanResults)
+                var currentBranch = branch;
+                tasks.Add(Task.Run(async () =>
                 {
-                    foreach (var port in host.Ports)
+                    using (var scope = _serviceProvider.CreateScope())
                     {
-                        port.Severity = portSeverities.ContainsKey(port.Port) 
-                            ? portSeverities[port.Port] 
-                            : "Info";
+                        var scopedScanService = scope.ServiceProvider.GetRequiredService<PortScanService>();
+
+                        var scanResults = await scopedScanService.ExecuteSubnetScanAsync(
+                            currentBranch.Branch_cidr,
+                            portsToScan
+                        );
+
+                        foreach (var host in scanResults)
+                        {
+                            foreach (var port in host.Ports)
+                            {
+                                port.Severity = portSeverities.ContainsKey(port.Port) 
+                                    ? portSeverities[port.Port] 
+                                    : "Info";
+                            }
+                        }
+
+                        if (scanResults.Any())
+                        {
+                            var branchChanges = await scopedScanService.BulkSaveResultsAsync(
+                                currentBranch.Branch_id, 
+                                scanResults, 
+                                sessionObj.Session_id,
+                                sessionObj.ScanDate,
+                                null
+                            );
+
+                            foreach (var change in branchChanges)
+                            {
+                                allChanges.Add(change);
+                            }
+                        }
+
+                        allResults.Add(new BranchScanResultResponse
+                        {
+                            BranchId = currentBranch.Branch_id,
+                            BranchName = currentBranch.Branch_name,
+                            BranchCidr = currentBranch.Branch_cidr,
+                            Summary = new BranchScanSummaryDto
+                            { 
+                                TotalHosts = scanResults.Count, 
+                                AliveHosts = scanResults.Count(r => r.IsHostAlive),
+                                DeadHosts = scanResults.Count(r => !r.IsHostAlive),
+                                TotalOpenPorts = scanResults.Sum(r => r.Ports.Count(p => p.Status))
+                            },
+                            Results = scanResults 
+                        });
                     }
-                }
-
-                if (scanResults.Any())
-                {
-                    var branchChanges = await _scanService.BulkSaveResultsAsync(
-                        branch.Branch_id, 
-                        scanResults, 
-                        sessionObj.Session_id,
-                        sessionObj.ScanDate,
-                        null
-                    );
-
-                    allChanges.AddRange(branchChanges);
-                }
-
-                allResults.Add(new
-                {
-                    branchId = branch.Branch_id,
-                    branchName = branch.Branch_name,
-                    branchCidr = branch.Branch_cidr,
-                    summary = new 
-                    { 
-                        totalHosts = scanResults.Count, 
-                        aliveHosts = scanResults.Count(r => r.IsHostAlive),
-                        deadHosts = scanResults.Count(r => !r.IsHostAlive),
-                        totalOpenPorts = scanResults.Sum(r => r.Ports.Count(p => p.Status))
-                    },
-                    results = scanResults 
-                });
+                }));
             }
+
+            await Task.WhenAll(tasks);
 
             if (allChanges.Any())
             {
@@ -171,7 +190,8 @@ namespace portscanner_backend.Controllers
                 }
             }
 
-            return Ok(allResults);
+            var sortedResults = allResults.OrderBy(r => r.BranchId).ToList();
+            return Ok(sortedResults);
         }
     }
 }

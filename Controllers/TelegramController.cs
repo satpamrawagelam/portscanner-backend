@@ -31,6 +31,8 @@ namespace portscanner_backend.Controllers
                 .FromSqlRaw("EXEC V2_sp_CheckPortByHost @IpAddress", IpAddress)
                 .ToListAsync();
 
+            if (data == null || !data.Any()) return Ok("IP not found or no scan data");    
+
             return Ok(data);
         }
 
