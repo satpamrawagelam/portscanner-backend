@@ -1,6 +1,8 @@
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using portscanner_backend.Services;
+using portscanner_backend.Models;
+using portscanner_backend.Data;
 
 namespace portscanner_backend.Services
 {
@@ -27,13 +29,17 @@ namespace portscanner_backend.Services
                 try
                 {
                     // Check if we should generate a Weekly Report
-                    // For example, generate on Sunday at 00:00 (or near it)
+                    // Generate on Monday at 00:00 (or near it)
                     var now = DateTime.Now;
 
-                    if (now.DayOfWeek == DayOfWeek.Sunday && now.Hour == 0)
+                    if (now.DayOfWeek == DayOfWeek.Monday && now.Hour == 0)
                     {
                         _logger.LogInformation("Triggering Weekly Report Generation...");
-                        await GenerateReportAsync("Weekly", now.AddDays(-7), now);
+                        // Ambil 1 minggu penuh (Senin 00:00:00 s.d Minggu 23:59:59)
+                        var prevWeekStart = now.Date.AddDays(-7);
+                        var prevWeekEnd = now.Date.AddSeconds(-1);
+
+                        await GenerateReportAsync("Weekly", prevWeekStart, prevWeekEnd);
                         // Sleep a bit more to avoid generating twice in the same hour
                         await Task.Delay(TimeSpan.FromHours(2), stoppingToken);
                         continue;
@@ -43,7 +49,11 @@ namespace portscanner_backend.Services
                     if (now.Day == 1 && now.Hour == 0)
                     {
                         _logger.LogInformation("Triggering Monthly Report Generation...");
-                        await GenerateReportAsync("Monthly", now.AddMonths(-1), now);
+                        // Ambil 1 bulan penuh di bulan sebelumnya (Misal: 1 Mei 00:00:00 s.d 31 Mei 23:59:59)
+                        var prevMonthStart = new DateTime(now.Year, now.Month, 1).AddMonths(-1);
+                        var prevMonthEnd = new DateTime(now.Year, now.Month, 1).AddSeconds(-1);
+
+                        await GenerateReportAsync("Monthly", prevMonthStart, prevMonthEnd);
                         await Task.Delay(TimeSpan.FromHours(2), stoppingToken);
                         continue;
                     }
@@ -61,9 +71,47 @@ namespace portscanner_backend.Services
         {
             using var scope = _scopeFactory.CreateScope();
             var generator = scope.ServiceProvider.GetRequiredService<ReportGeneratorService>();
+            var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
             string title = $"{type} Exposure Report - {start:dd MMM} to {end:dd MMM yyyy}";
-            await generator.GenerateReportAsync(start, end, title, type);
+
+            // 1. Buat record dengan status "generating" di database
+            var reportRecord = new GeneratedReport
+            {
+                Title = title,
+                Type = type,
+                DateStart = start,
+                DateEnd = end,
+                FilePath = "generating",
+                CreatedAt = DateTime.Now
+            };
+
+            dbContext.GeneratedReports.Add(reportRecord);
+            await dbContext.SaveChangesAsync();
+            int reportId = reportRecord.Id;
+
+            try
+            {
+                // 2. Lakukan proses generate PDF dan update statusnya ke path file PDF asli
+                await generator.GenerateReportAsync(start, end, title, type, reportId);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Gagal memproses pembuatan laporan terjadwal {type} (ID: {reportId}). Menghapus record...");
+                try
+                {
+                    var record = await dbContext.GeneratedReports.FindAsync(reportId);
+                    if (record != null)
+                    {
+                        dbContext.GeneratedReports.Remove(record);
+                        await dbContext.SaveChangesAsync();
+                    }
+                }
+                catch (Exception deleteEx)
+                {
+                    _logger.LogError(deleteEx, $"Gagal menghapus record report terjadwal (ID: {reportId}) setelah proses gagal.");
+                }
+            }
         }
     }
 }

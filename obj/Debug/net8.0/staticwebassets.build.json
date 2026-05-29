@@ -1,6 +1,6 @@
 {
   "Version": 1,
-  "Hash": "a11DCsN5CgfLPGGYD1ua9E+fVrjVFtFwipJcibntnCc=",
+  "Hash": "zakQPTacZP4cqVmqbLOFVtnHk7PzcL3P/Uh8LmIRuzE=",
   "Source": "portscanner-backend",
   "BasePath": "_content/portscanner-backend",
   "Mode": "Default",
@@ -15,6 +15,420 @@
       "Pattern": "**"
     }
   ],
-  "Assets": [],
-  "Endpoints": []
+  "Assets": [
+    {
+      "Identity": "D:\\MAGANG\\PAMA\\Project\\EEC New Schema\\portscanner-backend\\wwwroot\\reports\\Monthly_Report_20260528152130.pdf",
+      "SourceId": "portscanner-backend",
+      "SourceType": "Discovered",
+      "ContentRoot": "D:\\MAGANG\\PAMA\\Project\\EEC New Schema\\portscanner-backend\\wwwroot\\",
+      "BasePath": "_content/portscanner-backend",
+      "RelativePath": "reports/Monthly_Report_20260528152130#[.{fingerprint}]?.pdf",
+      "AssetKind": "All",
+      "AssetMode": "All",
+      "AssetRole": "Primary",
+      "AssetMergeBehavior": "",
+      "AssetMergeSource": "",
+      "RelatedAsset": "",
+      "AssetTraitName": "",
+      "AssetTraitValue": "",
+      "Fingerprint": "l0smn519no",
+      "Integrity": "VTLZYq8ywn9m1cfK15H8m47XKTd25Yd9NpAI845ZqxA=",
+      "CopyToOutputDirectory": "Never",
+      "CopyToPublishDirectory": "PreserveNewest",
+      "OriginalItemSpec": "wwwroot\\reports\\Monthly_Report_20260528152130.pdf"
+    },
+    {
+      "Identity": "D:\\MAGANG\\PAMA\\Project\\EEC New Schema\\portscanner-backend\\wwwroot\\reports\\Monthly_Report_20260528152154.pdf",
+      "SourceId": "portscanner-backend",
+      "SourceType": "Discovered",
+      "ContentRoot": "D:\\MAGANG\\PAMA\\Project\\EEC New Schema\\portscanner-backend\\wwwroot\\",
+      "BasePath": "_content/portscanner-backend",
+      "RelativePath": "reports/Monthly_Report_20260528152154#[.{fingerprint}]?.pdf",
+      "AssetKind": "All",
+      "AssetMode": "All",
+      "AssetRole": "Primary",
+      "AssetMergeBehavior": "",
+      "AssetMergeSource": "",
+      "RelatedAsset": "",
+      "AssetTraitName": "",
+      "AssetTraitValue": "",
+      "Fingerprint": "a8bjxzdbwy",
+      "Integrity": "mnyINulKYQ9ckYehgUSxViuxxecmK5Cvb19E2GsVkxQ=",
+      "CopyToOutputDirectory": "Never",
+      "CopyToPublishDirectory": "PreserveNewest",
+      "OriginalItemSpec": "wwwroot\\reports\\Monthly_Report_20260528152154.pdf"
+    },
+    {
+      "Identity": "D:\\MAGANG\\PAMA\\Project\\EEC New Schema\\portscanner-backend\\wwwroot\\reports\\Monthly_Report_20260528152904.pdf",
+      "SourceId": "portscanner-backend",
+      "SourceType": "Discovered",
+      "ContentRoot": "D:\\MAGANG\\PAMA\\Project\\EEC New Schema\\portscanner-backend\\wwwroot\\",
+      "BasePath": "_content/portscanner-backend",
+      "RelativePath": "reports/Monthly_Report_20260528152904#[.{fingerprint}]?.pdf",
+      "AssetKind": "All",
+      "AssetMode": "All",
+      "AssetRole": "Primary",
+      "AssetMergeBehavior": "",
+      "AssetMergeSource": "",
+      "RelatedAsset": "",
+      "AssetTraitName": "",
+      "AssetTraitValue": "",
+      "Fingerprint": "fshg7g5zg4",
+      "Integrity": "8Yro/HSOO83p4taEsjY8070XOVGU7L4kf5Wga4ZLwdA=",
+      "CopyToOutputDirectory": "Never",
+      "CopyToPublishDirectory": "PreserveNewest",
+      "OriginalItemSpec": "wwwroot\\reports\\Monthly_Report_20260528152904.pdf"
+    },
+    {
+      "Identity": "D:\\MAGANG\\PAMA\\Project\\EEC New Schema\\portscanner-backend\\wwwroot\\reports\\Weekly_Report_20260528152150.pdf",
+      "SourceId": "portscanner-backend",
+      "SourceType": "Discovered",
+      "ContentRoot": "D:\\MAGANG\\PAMA\\Project\\EEC New Schema\\portscanner-backend\\wwwroot\\",
+      "BasePath": "_content/portscanner-backend",
+      "RelativePath": "reports/Weekly_Report_20260528152150#[.{fingerprint}]?.pdf",
+      "AssetKind": "All",
+      "AssetMode": "All",
+      "AssetRole": "Primary",
+      "AssetMergeBehavior": "",
+      "AssetMergeSource": "",
+      "RelatedAsset": "",
+      "AssetTraitName": "",
+      "AssetTraitValue": "",
+      "Fingerprint": "ogj3sr1nl5",
+      "Integrity": "uMIwGZDcoz+gZBdcECmWIEbNguqRl8j4gkyyo+avq38=",
+      "CopyToOutputDirectory": "Never",
+      "CopyToPublishDirectory": "PreserveNewest",
+      "OriginalItemSpec": "wwwroot\\reports\\Weekly_Report_20260528152150.pdf"
+    }
+  ],
+  "Endpoints": [
+    {
+      "Route": "reports/Monthly_Report_20260528152130.l0smn519no.pdf",
+      "AssetFile": "D:\\MAGANG\\PAMA\\Project\\EEC New Schema\\portscanner-backend\\wwwroot\\reports\\Monthly_Report_20260528152130.pdf",
+      "Selectors": [],
+      "ResponseHeaders": [
+        {
+          "Name": "Accept-Ranges",
+          "Value": "bytes"
+        },
+        {
+          "Name": "Content-Length",
+          "Value": "9112301"
+        },
+        {
+          "Name": "Content-Type",
+          "Value": "application/pdf"
+        },
+        {
+          "Name": "ETag",
+          "Value": "\"VTLZYq8ywn9m1cfK15H8m47XKTd25Yd9NpAI845ZqxA=\""
+        },
+        {
+          "Name": "Last-Modified",
+          "Value": "Thu, 28 May 2026 08:21:42 GMT"
+        },
+        {
+          "Name": "Cache-Control",
+          "Value": "max-age=31536000, immutable"
+        }
+      ],
+      "EndpointProperties": [
+        {
+          "Name": "fingerprint",
+          "Value": "l0smn519no"
+        },
+        {
+          "Name": "label",
+          "Value": "reports/Monthly_Report_20260528152130.pdf"
+        },
+        {
+          "Name": "integrity",
+          "Value": "sha256-VTLZYq8ywn9m1cfK15H8m47XKTd25Yd9NpAI845ZqxA="
+        }
+      ]
+    },
+    {
+      "Route": "reports/Monthly_Report_20260528152130.pdf",
+      "AssetFile": "D:\\MAGANG\\PAMA\\Project\\EEC New Schema\\portscanner-backend\\wwwroot\\reports\\Monthly_Report_20260528152130.pdf",
+      "Selectors": [],
+      "ResponseHeaders": [
+        {
+          "Name": "Accept-Ranges",
+          "Value": "bytes"
+        },
+        {
+          "Name": "Content-Length",
+          "Value": "9112301"
+        },
+        {
+          "Name": "Content-Type",
+          "Value": "application/pdf"
+        },
+        {
+          "Name": "ETag",
+          "Value": "\"VTLZYq8ywn9m1cfK15H8m47XKTd25Yd9NpAI845ZqxA=\""
+        },
+        {
+          "Name": "Last-Modified",
+          "Value": "Thu, 28 May 2026 08:21:42 GMT"
+        },
+        {
+          "Name": "Cache-Control",
+          "Value": "no-cache"
+        }
+      ],
+      "EndpointProperties": [
+        {
+          "Name": "integrity",
+          "Value": "sha256-VTLZYq8ywn9m1cfK15H8m47XKTd25Yd9NpAI845ZqxA="
+        }
+      ]
+    },
+    {
+      "Route": "reports/Monthly_Report_20260528152154.a8bjxzdbwy.pdf",
+      "AssetFile": "D:\\MAGANG\\PAMA\\Project\\EEC New Schema\\portscanner-backend\\wwwroot\\reports\\Monthly_Report_20260528152154.pdf",
+      "Selectors": [],
+      "ResponseHeaders": [
+        {
+          "Name": "Accept-Ranges",
+          "Value": "bytes"
+        },
+        {
+          "Name": "Content-Length",
+          "Value": "9109329"
+        },
+        {
+          "Name": "Content-Type",
+          "Value": "application/pdf"
+        },
+        {
+          "Name": "ETag",
+          "Value": "\"mnyINulKYQ9ckYehgUSxViuxxecmK5Cvb19E2GsVkxQ=\""
+        },
+        {
+          "Name": "Last-Modified",
+          "Value": "Thu, 28 May 2026 08:22:04 GMT"
+        },
+        {
+          "Name": "Cache-Control",
+          "Value": "max-age=31536000, immutable"
+        }
+      ],
+      "EndpointProperties": [
+        {
+          "Name": "fingerprint",
+          "Value": "a8bjxzdbwy"
+        },
+        {
+          "Name": "label",
+          "Value": "reports/Monthly_Report_20260528152154.pdf"
+        },
+        {
+          "Name": "integrity",
+          "Value": "sha256-mnyINulKYQ9ckYehgUSxViuxxecmK5Cvb19E2GsVkxQ="
+        }
+      ]
+    },
+    {
+      "Route": "reports/Monthly_Report_20260528152154.pdf",
+      "AssetFile": "D:\\MAGANG\\PAMA\\Project\\EEC New Schema\\portscanner-backend\\wwwroot\\reports\\Monthly_Report_20260528152154.pdf",
+      "Selectors": [],
+      "ResponseHeaders": [
+        {
+          "Name": "Accept-Ranges",
+          "Value": "bytes"
+        },
+        {
+          "Name": "Content-Length",
+          "Value": "9109329"
+        },
+        {
+          "Name": "Content-Type",
+          "Value": "application/pdf"
+        },
+        {
+          "Name": "ETag",
+          "Value": "\"mnyINulKYQ9ckYehgUSxViuxxecmK5Cvb19E2GsVkxQ=\""
+        },
+        {
+          "Name": "Last-Modified",
+          "Value": "Thu, 28 May 2026 08:22:04 GMT"
+        },
+        {
+          "Name": "Cache-Control",
+          "Value": "no-cache"
+        }
+      ],
+      "EndpointProperties": [
+        {
+          "Name": "integrity",
+          "Value": "sha256-mnyINulKYQ9ckYehgUSxViuxxecmK5Cvb19E2GsVkxQ="
+        }
+      ]
+    },
+    {
+      "Route": "reports/Monthly_Report_20260528152904.fshg7g5zg4.pdf",
+      "AssetFile": "D:\\MAGANG\\PAMA\\Project\\EEC New Schema\\portscanner-backend\\wwwroot\\reports\\Monthly_Report_20260528152904.pdf",
+      "Selectors": [],
+      "ResponseHeaders": [
+        {
+          "Name": "Accept-Ranges",
+          "Value": "bytes"
+        },
+        {
+          "Name": "Content-Length",
+          "Value": "9113832"
+        },
+        {
+          "Name": "Content-Type",
+          "Value": "application/pdf"
+        },
+        {
+          "Name": "ETag",
+          "Value": "\"8Yro/HSOO83p4taEsjY8070XOVGU7L4kf5Wga4ZLwdA=\""
+        },
+        {
+          "Name": "Last-Modified",
+          "Value": "Thu, 28 May 2026 08:29:15 GMT"
+        },
+        {
+          "Name": "Cache-Control",
+          "Value": "max-age=31536000, immutable"
+        }
+      ],
+      "EndpointProperties": [
+        {
+          "Name": "fingerprint",
+          "Value": "fshg7g5zg4"
+        },
+        {
+          "Name": "label",
+          "Value": "reports/Monthly_Report_20260528152904.pdf"
+        },
+        {
+          "Name": "integrity",
+          "Value": "sha256-8Yro/HSOO83p4taEsjY8070XOVGU7L4kf5Wga4ZLwdA="
+        }
+      ]
+    },
+    {
+      "Route": "reports/Monthly_Report_20260528152904.pdf",
+      "AssetFile": "D:\\MAGANG\\PAMA\\Project\\EEC New Schema\\portscanner-backend\\wwwroot\\reports\\Monthly_Report_20260528152904.pdf",
+      "Selectors": [],
+      "ResponseHeaders": [
+        {
+          "Name": "Accept-Ranges",
+          "Value": "bytes"
+        },
+        {
+          "Name": "Content-Length",
+          "Value": "9113832"
+        },
+        {
+          "Name": "Content-Type",
+          "Value": "application/pdf"
+        },
+        {
+          "Name": "ETag",
+          "Value": "\"8Yro/HSOO83p4taEsjY8070XOVGU7L4kf5Wga4ZLwdA=\""
+        },
+        {
+          "Name": "Last-Modified",
+          "Value": "Thu, 28 May 2026 08:29:15 GMT"
+        },
+        {
+          "Name": "Cache-Control",
+          "Value": "no-cache"
+        }
+      ],
+      "EndpointProperties": [
+        {
+          "Name": "integrity",
+          "Value": "sha256-8Yro/HSOO83p4taEsjY8070XOVGU7L4kf5Wga4ZLwdA="
+        }
+      ]
+    },
+    {
+      "Route": "reports/Weekly_Report_20260528152150.ogj3sr1nl5.pdf",
+      "AssetFile": "D:\\MAGANG\\PAMA\\Project\\EEC New Schema\\portscanner-backend\\wwwroot\\reports\\Weekly_Report_20260528152150.pdf",
+      "Selectors": [],
+      "ResponseHeaders": [
+        {
+          "Name": "Accept-Ranges",
+          "Value": "bytes"
+        },
+        {
+          "Name": "Content-Length",
+          "Value": "1334481"
+        },
+        {
+          "Name": "Content-Type",
+          "Value": "application/pdf"
+        },
+        {
+          "Name": "ETag",
+          "Value": "\"uMIwGZDcoz+gZBdcECmWIEbNguqRl8j4gkyyo+avq38=\""
+        },
+        {
+          "Name": "Last-Modified",
+          "Value": "Thu, 28 May 2026 08:21:50 GMT"
+        },
+        {
+          "Name": "Cache-Control",
+          "Value": "max-age=31536000, immutable"
+        }
+      ],
+      "EndpointProperties": [
+        {
+          "Name": "fingerprint",
+          "Value": "ogj3sr1nl5"
+        },
+        {
+          "Name": "label",
+          "Value": "reports/Weekly_Report_20260528152150.pdf"
+        },
+        {
+          "Name": "integrity",
+          "Value": "sha256-uMIwGZDcoz+gZBdcECmWIEbNguqRl8j4gkyyo+avq38="
+        }
+      ]
+    },
+    {
+      "Route": "reports/Weekly_Report_20260528152150.pdf",
+      "AssetFile": "D:\\MAGANG\\PAMA\\Project\\EEC New Schema\\portscanner-backend\\wwwroot\\reports\\Weekly_Report_20260528152150.pdf",
+      "Selectors": [],
+      "ResponseHeaders": [
+        {
+          "Name": "Accept-Ranges",
+          "Value": "bytes"
+        },
+        {
+          "Name": "Content-Length",
+          "Value": "1334481"
+        },
+        {
+          "Name": "Content-Type",
+          "Value": "application/pdf"
+        },
+        {
+          "Name": "ETag",
+          "Value": "\"uMIwGZDcoz+gZBdcECmWIEbNguqRl8j4gkyyo+avq38=\""
+        },
+        {
+          "Name": "Last-Modified",
+          "Value": "Thu, 28 May 2026 08:21:50 GMT"
+        },
+        {
+          "Name": "Cache-Control",
+          "Value": "no-cache"
+        }
+      ],
+      "EndpointProperties": [
+        {
+          "Name": "integrity",
+          "Value": "sha256-uMIwGZDcoz+gZBdcECmWIEbNguqRl8j4gkyyo+avq38="
+        }
+      ]
+    }
+  ]
 }

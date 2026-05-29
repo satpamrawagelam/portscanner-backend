@@ -1,3 +1,5 @@
+using System.IO;
+using System.Text;
 using Microsoft.EntityFrameworkCore;
 using portscanner_backend.Data;
 using portscanner_backend.Models;
@@ -5,6 +7,7 @@ using portscanner_backend.Models.Dto;
 using QuestPDF.Fluent;
 using QuestPDF.Helpers;
 using QuestPDF.Infrastructure;
+using Microsoft.Extensions.Configuration;
 
 namespace portscanner_backend.Services
 {
@@ -12,25 +15,31 @@ namespace portscanner_backend.Services
     {
         private readonly IServiceScopeFactory _scopeFactory;
         private readonly IWebHostEnvironment _env;
+        private readonly IConfiguration _config;
 
-        public ReportGeneratorService(IServiceScopeFactory scopeFactory, IWebHostEnvironment env)
+        public ReportGeneratorService(IServiceScopeFactory scopeFactory, IWebHostEnvironment env, IConfiguration config)
         {
             _scopeFactory = scopeFactory;
             _env = env;
+            _config = config;
             // Configure QuestPDF license (Community is free for small companies)
             QuestPDF.Settings.License = LicenseType.Community;
         }
 
-        public async Task GenerateReportAsync(DateTime dateStart, DateTime dateEnd, string reportTitle, string reportType)
+        public async Task GenerateReportAsync(DateTime dateStart, DateTime dateEnd, string reportTitle, string reportType, int? existingReportId = null, string scanType = "all", string search = "")
         {
             using var scope = _scopeFactory.CreateScope();
             var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
             // 1. Fetch Data
-            var data = await FetchReportDataAsync(dbContext, dateStart, dateEnd);
+            var data = await FetchReportDataAsync(dbContext, dateStart, dateEnd, scanType, search);
 
             // 2. Setup File Path
-            string reportsFolder = Path.Combine(_env.WebRootPath ?? Path.Combine(Directory.GetCurrentDirectory(), "wwwroot"), "reports");
+            var outputPath = _config["ReportSettings:OutputPath"] ?? "../Reports";
+            string reportsFolder = Path.IsPathRooted(outputPath)
+                ? outputPath
+                : Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), outputPath));
+
             if (!Directory.Exists(reportsFolder))
                 Directory.CreateDirectory(reportsFolder);
 
@@ -54,22 +63,40 @@ namespace portscanner_backend.Services
                 });
             }).GeneratePdf(filePath);
 
-            // 4. Save to DB
-            var reportRecord = new GeneratedReport
-            {
-                Title = reportTitle,
-                Type = reportType,
-                DateStart = dateStart,
-                DateEnd = dateEnd,
-                FilePath = urlPath,
-                CreatedAt = DateTime.Now
-            };
+            // Generate companion CSV file containing details
+            string csvFileName = Path.ChangeExtension(fileName, ".csv");
+            string csvFilePath = Path.Combine(reportsFolder, csvFileName);
+            await GenerateCsvAsync(csvFilePath, data.DetailHistory);
 
-            dbContext.GeneratedReports.Add(reportRecord);
-            await dbContext.SaveChangesAsync();
+            // 4. Save/Update DB
+            if (existingReportId.HasValue)
+            {
+                var record = await dbContext.GeneratedReports.FindAsync(existingReportId.Value);
+                if (record != null)
+                {
+                    record.FilePath = urlPath;
+                    record.CreatedAt = DateTime.Now; // Update created time to completion time
+                    await dbContext.SaveChangesAsync();
+                }
+            }
+            else
+            {
+                var reportRecord = new GeneratedReport
+                {
+                    Title = reportTitle,
+                    Type = reportType,
+                    DateStart = dateStart,
+                    DateEnd = dateEnd,
+                    FilePath = urlPath,
+                    CreatedAt = DateTime.Now
+                };
+
+                dbContext.GeneratedReports.Add(reportRecord);
+                await dbContext.SaveChangesAsync();
+            }
         }
 
-        private async Task<ScanReportResponseDto> FetchReportDataAsync(AppDbContext dbContext, DateTime dateStart, DateTime dateEnd)
+        private async Task<ScanReportResponseDto> FetchReportDataAsync(AppDbContext dbContext, DateTime dateStart, DateTime dateEnd, string scanType, string search)
         {
             var cmd = dbContext.Database.GetDbConnection().CreateCommand();
             cmd.CommandText = "V2_sp_GetScanHistoryReport";
@@ -87,12 +114,12 @@ namespace portscanner_backend.Services
 
             var pScanType = cmd.CreateParameter();
             pScanType.ParameterName = "@ScanType";
-            pScanType.Value = "all";
+            pScanType.Value = scanType;
             cmd.Parameters.Add(pScanType);
 
             var pSearch = cmd.CreateParameter();
             pSearch.ParameterName = "@SearchTerm";
-            pSearch.Value = "";
+            pSearch.Value = search ?? "";
             cmd.Parameters.Add(pSearch);
 
             await dbContext.Database.OpenConnectionAsync();
@@ -423,6 +450,60 @@ namespace portscanner_backend.Services
                 x.Span(" of ").FontSize(8);
                 x.TotalPages().FontSize(8);
             });
+        }
+
+        private async Task GenerateCsvAsync(string csvPath, List<ScanHistoryDto> details)
+        {
+            using (var writer = new StreamWriter(csvPath, false, new UTF8Encoding(true)))
+            {
+                // Instruct Excel to use comma as separator
+                await writer.WriteLineAsync("sep=,");
+
+                // Write headers
+                await writer.WriteLineAsync("No,Scan Date,Scan Title,Scan Type,Zone,IP Address,Status Host,Open Ports");
+
+                for (int i = 0; i < details.Count; i++)
+                {
+                    var item = details[i];
+                    int no = i + 1;
+                    string scanDate = item.ScanDate.ToString("yyyy-MM-dd HH:mm:ss");
+                    string scanTitle = EscapeCsvField(item.ScanTitle);
+                    string scanType = EscapeCsvField(item.ScanType);
+                    string zone = EscapeCsvField(item.BranchName);
+                    string ipAddress = EscapeCsvField(item.IpAddress);
+                    string statusHost = item.HostStatus ? "UP" : "DOWN";
+                    string openPorts = EscapeCsvField(FormatPortsForCsv(item.OpenPorts));
+
+                    await writer.WriteLineAsync($"{no},{scanDate},{scanTitle},{scanType},{zone},{ipAddress},{statusHost},{openPorts}");
+                }
+            }
+        }
+
+        private string FormatPortsForCsv(string portsStr)
+        {
+            if (string.IsNullOrWhiteSpace(portsStr) || portsStr == "-")
+                return "-";
+
+            var ports = portsStr.Split(',')
+                .Select(s => s.Trim())
+                .Where(s => !string.IsNullOrEmpty(s))
+                .Select(p => {
+                    var parts = p.Split('|');
+                    return parts[0];
+                });
+
+            return string.Join(", ", ports);
+        }
+
+        private string EscapeCsvField(string field)
+        {
+            if (field == null) return string.Empty;
+            string escaped = field.Replace("\"", "\"\"");
+            if (escaped.Contains(",") || escaped.Contains("\"") || escaped.Contains(";") || escaped.Contains("\n") || escaped.Contains("\r"))
+            {
+                return $"\"{escaped}\"";
+            }
+            return escaped;
         }
     }
 }

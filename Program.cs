@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using portscanner_backend.Data;
 using portscanner_backend.Services;
 using portscanner_backend.Workers;
+using Microsoft.Extensions.FileProviders;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -35,11 +36,15 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddMemoryCache();
 builder.Services.AddSwaggerGen();
 
-// Ensure wwwroot/reports exists so UseStaticFiles works even on first run
-var webRootPath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot");
-if (!Directory.Exists(Path.Combine(webRootPath, "reports")))
+// Ensure the reports output directory exists
+var outputPath = builder.Configuration["ReportSettings:OutputPath"] ?? "../Reports";
+var absoluteOutputPath = Path.IsPathRooted(outputPath)
+    ? outputPath
+    : Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), outputPath));
+
+if (!Directory.Exists(absoluteOutputPath))
 {
-    Directory.CreateDirectory(Path.Combine(webRootPath, "reports"));
+    Directory.CreateDirectory(absoluteOutputPath);
 }
 
 var app = builder.Build();
@@ -54,7 +59,13 @@ if (app.Environment.IsDevelopment())
 // app.UseHttpsRedirection();
 
 app.UseCors("AllowReactApp");
-app.UseStaticFiles(); // Enable serving PDF files from wwwroot
+app.UseStaticFiles(); // Enable serving static files from wwwroot
+
+app.UseStaticFiles(new StaticFileOptions
+{
+    FileProvider = new PhysicalFileProvider(absoluteOutputPath),
+    RequestPath = "/reports"
+});
 
 app.UseAuthorization();
 
