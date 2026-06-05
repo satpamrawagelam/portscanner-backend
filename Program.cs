@@ -49,6 +49,28 @@ if (!Directory.Exists(absoluteOutputPath))
 
 var app = builder.Build();
 
+// Clean up stale "generating" report records from the database on startup (e.g. after a crash or server restart)
+using (var scope = app.Services.CreateScope())
+{
+    var context = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    try
+    {
+        var staleReports = context.GeneratedReports.Where(r => r.FilePath == "generating").ToList();
+        if (staleReports.Any())
+        {
+            context.GeneratedReports.RemoveRange(staleReports);
+            context.SaveChanges();
+            var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+            logger.LogInformation($"[STARTUP] Berhasil membersihkan {staleReports.Count} data report menggantung yang berstatus 'generating'.");
+        }
+    }
+    catch (Exception ex)
+    {
+        var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+        logger.LogError(ex, "[STARTUP] Gagal membersihkan report menggantung.");
+    }
+}
+
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
@@ -59,7 +81,7 @@ if (app.Environment.IsDevelopment())
 // app.UseHttpsRedirection();
 
 app.UseCors("AllowReactApp");
-app.UseStaticFiles(); // Enable serving static files from wwwroot
+app.UseStaticFiles();
 
 app.UseStaticFiles(new StaticFileOptions
 {

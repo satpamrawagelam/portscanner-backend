@@ -68,12 +68,12 @@ namespace portscanner_backend.Controllers
                     System.IO.File.Delete(physicalPath);
                 }
 
-                // Delete companion CSV file if it exists
-                string csvFileName = Path.ChangeExtension(fileName, ".csv");
-                string csvPhysicalPath = Path.Combine(reportsFolder, csvFileName);
-                if (System.IO.File.Exists(csvPhysicalPath))
+                // Delete companion Excel file if it exists
+                string xlsxFileName = Path.ChangeExtension(fileName, ".xlsx");
+                string xlsxPhysicalPath = Path.Combine(reportsFolder, xlsxFileName);
+                if (System.IO.File.Exists(xlsxPhysicalPath))
                 {
-                    System.IO.File.Delete(csvPhysicalPath);
+                    System.IO.File.Delete(xlsxPhysicalPath);
                 }
 
                 // Delete DB record

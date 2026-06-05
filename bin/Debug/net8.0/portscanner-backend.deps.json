@@ -8,11 +8,14 @@
     ".NETCoreApp,Version=v8.0": {
       "portscanner-backend/1.0.0": {
         "dependencies": {
+          "HarfBuzzSharp.NativeAssets.Linux": "7.3.0",
           "Microsoft.EntityFrameworkCore": "8.0.0",
           "Microsoft.EntityFrameworkCore.Design": "8.0.0",
           "Microsoft.EntityFrameworkCore.SqlServer": "8.0.0",
           "Microsoft.EntityFrameworkCore.Tools": "8.0.0",
+          "MiniExcel": "1.44.1",
           "QuestPDF": "2023.12.6",
+          "SkiaSharp.NativeAssets.Linux.NoDependencies": "2.88.6",
           "Swashbuckle.AspNetCore": "6.2.3"
         },
         "runtime": {
@@ -62,6 +65,33 @@
           "lib/net6.0/HarfBuzzSharp.dll": {
             "assemblyVersion": "1.0.0.0",
             "fileVersion": "7.3.0.1"
+          }
+        }
+      },
+      "HarfBuzzSharp.NativeAssets.Linux/7.3.0": {
+        "dependencies": {
+          "HarfBuzzSharp": "7.3.0.1"
+        },
+        "runtimeTargets": {
+          "runtimes/linux-arm/native/libHarfBuzzSharp.so": {
+            "rid": "linux-arm",
+            "assetType": "native",
+            "fileVersion": "0.0.0.0"
+          },
+          "runtimes/linux-arm64/native/libHarfBuzzSharp.so": {
+            "rid": "linux-arm64",
+            "assetType": "native",
+            "fileVersion": "0.0.0.0"
+          },
+          "runtimes/linux-musl-x64/native/libHarfBuzzSharp.so": {
+            "rid": "linux-musl-x64",
+            "assetType": "native",
+            "fileVersion": "0.0.0.0"
+          },
+          "runtimes/linux-x64/native/libHarfBuzzSharp.so": {
+            "rid": "linux-x64",
+            "assetType": "native",
+            "fileVersion": "0.0.0.0"
           }
         }
       },
@@ -642,6 +672,14 @@
           }
         }
       },
+      "MiniExcel/1.44.1": {
+        "runtime": {
+          "lib/net8.0/MiniExcel.dll": {
+            "assemblyVersion": "1.44.1.0",
+            "fileVersion": "1.44.1.0"
+          }
+        }
+      },
       "Mono.TextTemplating/2.2.1": {
         "dependencies": {
           "System.CodeDom": "4.4.0"
@@ -686,6 +724,33 @@
           "lib/net6.0/SkiaSharp.HarfBuzz.dll": {
             "assemblyVersion": "2.88.0.0",
             "fileVersion": "2.88.7.0"
+          }
+        }
+      },
+      "SkiaSharp.NativeAssets.Linux.NoDependencies/2.88.6": {
+        "dependencies": {
+          "SkiaSharp": "2.88.7"
+        },
+        "runtimeTargets": {
+          "runtimes/linux-arm/native/libSkiaSharp.so": {
+            "rid": "linux-arm",
+            "assetType": "native",
+            "fileVersion": "0.0.0.0"
+          },
+          "runtimes/linux-arm64/native/libSkiaSharp.so": {
+            "rid": "linux-arm64",
+            "assetType": "native",
+            "fileVersion": "0.0.0.0"
+          },
+          "runtimes/linux-musl-x64/native/libSkiaSharp.so": {
+            "rid": "linux-musl-x64",
+            "assetType": "native",
+            "fileVersion": "0.0.0.0"
+          },
+          "runtimes/linux-x64/native/libSkiaSharp.so": {
+            "rid": "linux-x64",
+            "assetType": "native",
+            "fileVersion": "0.0.0.0"
           }
         }
       },
@@ -1032,6 +1097,13 @@
       "path": "harfbuzzsharp/7.3.0.1",
       "hashPath": "harfbuzzsharp.7.3.0.1.nupkg.sha512"
     },
+    "HarfBuzzSharp.NativeAssets.Linux/7.3.0": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-m6F2pEBTN0zTRgQ3caJQRGQkZZizZwHHCbu+rTv+gvwteNBOpqOLD5GE4dB9TFjNNpnyHXtfuMD86JuUra9UvA==",
+      "path": "harfbuzzsharp.nativeassets.linux/7.3.0",
+      "hashPath": "harfbuzzsharp.nativeassets.linux.7.3.0.nupkg.sha512"
+    },
     "HarfBuzzSharp.NativeAssets.macOS/7.3.0.1": {
       "type": "package",
       "serviceable": true,
@@ -1333,6 +1405,13 @@
       "path": "microsoft.win32.systemevents/6.0.0",
       "hashPath": "microsoft.win32.systemevents.6.0.0.nupkg.sha512"
     },
+    "MiniExcel/1.44.1": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-9O+Xmazr7d46iplPO/Egd4Xl9vHyM9CRDIKqOy/rMVh6hREThPoNfzd57JPVTdwqftd9aPU/lT/l7fQGvbTszg==",
+      "path": "miniexcel/1.44.1",
+      "hashPath": "miniexcel.1.44.1.nupkg.sha512"
+    },
     "Mono.TextTemplating/2.2.1": {
       "type": "package",
       "serviceable": true,
@@ -1360,6 +1439,13 @@
       "sha512": "sha512-4Vd+GpokorZNpDvUp09zjK6CMXN35zyJtNvzkGtS1TsXlG/5yA3lWTsQIU0nSQjfgpYql0tSEU5+WTsjxljugg==",
       "path": "skiasharp.harfbuzz/2.88.7",
       "hashPath": "skiasharp.harfbuzz.2.88.7.nupkg.sha512"
+    },
+    "SkiaSharp.NativeAssets.Linux.NoDependencies/2.88.6": {
+      "type": "package",
+      "serviceable": true,
+      "sha512": "sha512-ecgMclPor+X1wi2dZSVDo1sV2Dm8gwEKNRtS+qiE9qfnQzGHbYWlbTBWalnZBaIl3BLC21b1QO8gMgabhSAh+g==",
+      "path": "skiasharp.nativeassets.linux.nodependencies/2.88.6",
+      "hashPath": "skiasharp.nativeassets.linux.nodependencies.2.88.6.nupkg.sha512"
     },
     "SkiaSharp.NativeAssets.macOS/2.88.7": {
       "type": "package",

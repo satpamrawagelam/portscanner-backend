@@ -120,6 +120,7 @@ namespace portscanner_backend.Models.Dto
         public List<TopBranchReportDto> TopBranches { get; set; } = new();
         public List<TopHostReportDto> TopHosts { get; set; } = new();
         public List<TopPortReportDto> TopPorts { get; set; } = new();
+        public List<TopBranchReportDto> TopHighSeverityBranches { get; set; } = new();
         public List<ScanHistoryDto> DetailHistory { get; set; } = new();
     }
 
