@@ -8,8 +8,6 @@ namespace portscanner_backend.Controllers
 {
     public class AlertController
     {
-        private static readonly string BotToken = "8701759753:AAEXS1osI_zbIl0Xszl2mZj6SdLnIgJmYyk";
-        private static readonly string ChatId = "1002849164";
         
         public static async Task SendAlertAsync(string message)
         {
