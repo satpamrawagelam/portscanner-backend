@@ -57,5 +57,12 @@ namespace portscanner_backend.Controllers
             var data = await _service.GetRiskDistributionAsync();
             return Ok(data);
         }
+
+        [HttpGet]
+        public async Task<IActionResult> GetVulnerableHosts()
+        {
+            var data = await _service.GetVulnerableHostsAsync();
+            return Ok(data);
+        }
     }
 }

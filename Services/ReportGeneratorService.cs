@@ -56,7 +56,7 @@ namespace portscanner_backend.Services
                     page.Size(PageSizes.A4.Landscape());
                     page.Margin(1, Unit.Centimetre);
                     page.PageColor(Colors.White);
-                    page.DefaultTextStyle(x => x.FontSize(9).FontFamily("Arial"));
+                    page.DefaultTextStyle(x => x.FontSize(9).FontFamily("Arial")); // Kalo di linux "DejaVu Sans"
 
                     page.Header().Element(c => ComposeHeader(c, dateStart, dateEnd));
                     page.Content().Element(c => ComposeContent(c, data));
@@ -135,6 +135,7 @@ namespace portscanner_backend.Services
                 summary.TotalHostWithOpenPort = reader.GetInt32(reader.GetOrdinal("TotalHostWithOpenPort"));
                 summary.HighSeverityPortCount = reader.GetInt32(reader.GetOrdinal("HighSeverityPortCount"));
                 summary.MediumSeverityPortCount = reader.GetInt32(reader.GetOrdinal("MediumSeverityPortCount"));
+                summary.TotalRiskScore = reader.IsDBNull(reader.GetOrdinal("TotalRiskScore")) ? 0 : reader.GetInt32(reader.GetOrdinal("TotalRiskScore"));
             }
 
             await reader.NextResultAsync();
@@ -225,13 +226,13 @@ namespace portscanner_backend.Services
                     row.RelativeItem().Column(c =>
                     {
                         c.Item().PaddingBottom(2).Text("Top 10 Branches with High Risk Exposure").Bold().FontSize(10);
-                        DrawTopBranchesTable(c, data.TopBranches);
+                        DrawTopBranchesTable(c, data.TopBranches, data.Summary.TotalRiskScore);
                     });
                     row.ConstantItem(10); // spacing
                     row.RelativeItem().Column(c =>
                     {
-                        c.Item().PaddingBottom(2).Text("Top 10 Branches with strict HIGH Severity Port Exposure").Bold().FontSize(10);
-                        DrawTopBranchesTable(c, data.TopHighSeverityBranches);
+                        c.Item().PaddingBottom(2).Text("Top 10 Branches with HIGH Severity Port Exposure").Bold().FontSize(10);
+                        DrawTopBranchesTable(c, data.TopHighSeverityBranches, data.Summary.TotalRiskScore);
                     });
                 });
 
@@ -242,8 +243,8 @@ namespace portscanner_backend.Services
                 {
                     row.RelativeItem().Column(c =>
                     {
-                        c.Item().PaddingBottom(2).Text("Top 10 IP Address with High Risk Exposure").Bold().FontSize(10);
-                        DrawTopHostsTable(c, data.TopHosts);
+                        c.Item().PaddingBottom(2).Text("Top 10 Host with High Risk Exposure").Bold().FontSize(10);
+                        DrawTopHostsTable(c, data.TopHosts, data.Summary.TotalRiskScore);
                     });
                     row.ConstantItem(10); // spacing
                     row.RelativeItem().Column(c =>
@@ -253,32 +254,32 @@ namespace portscanner_backend.Services
                     });
                 });
 
-                col.Item().PaddingTop(10).Column(c =>
-                {
-                    c.Item().PaddingBottom(2).Text("Security & Remediation Guidelines").Bold().FontSize(10);
-                    c.Item().Border(1).BorderColor("#cbd5e1").Background("#f8fafc").Padding(8).Column(guide =>
-                    {
-                        guide.Item().Row(r =>
-                        {
-                            r.RelativeItem().Column(g =>
-                            {
-                                g.Item().Text("1. HIGH Severity Findings (Port 21, 22, 23, 3389, etc.):").Bold().FontSize(8).FontColor("#b4320a");
-                                g.Item().PaddingLeft(5).Text("• Segera tutup akses publik (Block di level Firewall/Router).").FontSize(7.5f).FontColor(Colors.Grey.Darken3);
-                                g.Item().PaddingLeft(5).Text("• Gunakan VPN Enterprise atau IP Whitelisting jika port harus diakses.").FontSize(7.5f).FontColor(Colors.Grey.Darken3);
-                            });
-                            r.ConstantItem(20);
-                            r.RelativeItem().Column(g =>
-                            {
-                                g.Item().Text("2. MEDIUM Severity Findings (Port 80, 443, 8080, etc.):").Bold().FontSize(8).FontColor("#856404");
-                                g.Item().PaddingLeft(5).Text("• Pastikan service web menggunakan sertifikat SSL/TLS valid (HTTPS).").FontSize(7.5f).FontColor(Colors.Grey.Darken3);
-                                g.Item().PaddingLeft(5).Text("• Lakukan update/patching web server berkala secara konsisten.").FontSize(7.5f).FontColor(Colors.Grey.Darken3);
-                            });
-                        });
+                // col.Item().PaddingTop(10).Column(c =>
+                // {
+                //     c.Item().PaddingBottom(2).Text("Security & Remediation Guidelines").Bold().FontSize(10);
+                //     c.Item().Border(1).BorderColor("#cbd5e1").Background("#f8fafc").Padding(8).Column(guide =>
+                //     {
+                //         guide.Item().Row(r =>
+                //         {
+                //             r.RelativeItem().Column(g =>
+                //             {
+                //                 g.Item().Text("1. HIGH Severity Findings (Port 21, 22, 23, 3389, etc.):").Bold().FontSize(8).FontColor("#b4320a");
+                //                 g.Item().PaddingLeft(5).Text("• Segera tutup akses publik (Block di level Firewall/Router).").FontSize(7.5f).FontColor(Colors.Grey.Darken3);
+                //                 g.Item().PaddingLeft(5).Text("• Gunakan VPN Enterprise atau IP Whitelisting jika port harus diakses.").FontSize(7.5f).FontColor(Colors.Grey.Darken3);
+                //             });
+                //             r.ConstantItem(20);
+                //             r.RelativeItem().Column(g =>
+                //             {
+                //                 g.Item().Text("2. MEDIUM Severity Findings (Port 80, 443, 8080, etc.):").Bold().FontSize(8).FontColor("#856404");
+                //                 g.Item().PaddingLeft(5).Text("• Pastikan service web menggunakan sertifikat SSL/TLS valid (HTTPS).").FontSize(7.5f).FontColor(Colors.Grey.Darken3);
+                //                 g.Item().PaddingLeft(5).Text("• Lakukan update/patching web server berkala secara konsisten.").FontSize(7.5f).FontColor(Colors.Grey.Darken3);
+                //             });
+                //         });
                         
-                        guide.Item().PaddingTop(5).Text("Catatan Laporan:").Bold().FontSize(8).FontColor("#0f172a");
-                        guide.Item().PaddingLeft(5).Text("• Seluruh detail data histori scan lengkap telah diekspor ke file Excel pendamping (.xlsx).").FontSize(7.5f).FontColor(Colors.Grey.Darken3);
-                    });
-                });
+                //         guide.Item().PaddingTop(5).Text("Catatan Laporan:").Bold().FontSize(8).FontColor("#0f172a");
+                //         guide.Item().PaddingLeft(5).Text("• Seluruh detail data histori scan lengkap telah diekspor ke file Excel pendamping (.xlsx).").FontSize(7.5f).FontColor(Colors.Grey.Darken3);
+                //     });
+                // });
             });
         }
 
@@ -291,7 +292,7 @@ namespace portscanner_backend.Services
             });
         }
 
-        private void DrawTopBranchesTable(ColumnDescriptor col, List<TopBranchReportDto> data)
+        private void DrawTopBranchesTable(ColumnDescriptor col, List<TopBranchReportDto> data, double totalRisk)
         {
             col.Item().Table(table =>
             {
@@ -314,15 +315,18 @@ namespace portscanner_backend.Services
                 for (int i = 0; i < data.Count; i++)
                 {
                     var item = data[i];
+                    double percentage = totalRisk > 0 ? ((double)item.RiskScore / totalRisk) * 100 : 0;
+                    string displayRisk = $"{percentage:F1}/100";
+
                     table.Cell().BorderBottom(1).BorderColor(Colors.Grey.Lighten2).Padding(3).Text((i + 1).ToString()).FontSize(8);
                     table.Cell().BorderBottom(1).BorderColor(Colors.Grey.Lighten2).Padding(3).Text(item.BranchName).FontSize(8);
                     table.Cell().BorderBottom(1).BorderColor(Colors.Grey.Lighten2).Padding(3).Text(item.OpenPortCount.ToString()).FontSize(8);
-                    table.Cell().BorderBottom(1).BorderColor(Colors.Grey.Lighten2).Padding(3).Text(item.RiskScore.ToString()).FontSize(8);
+                    table.Cell().BorderBottom(1).BorderColor(Colors.Grey.Lighten2).Padding(3).Text(displayRisk).FontSize(8);
                 }
             });
         }
 
-        private void DrawTopHostsTable(ColumnDescriptor col, List<TopHostReportDto> data)
+        private void DrawTopHostsTable(ColumnDescriptor col, List<TopHostReportDto> data, double totalRisk)
         {
             col.Item().Table(table =>
             {
@@ -347,11 +351,14 @@ namespace portscanner_backend.Services
                 for (int i = 0; i < data.Count; i++)
                 {
                     var item = data[i];
+                    double percentage = totalRisk > 0 ? ((double)item.RiskScore / totalRisk) * 100 : 0;
+                    string displayRisk = $"{percentage:F1}/100";
+
                     table.Cell().BorderBottom(1).BorderColor(Colors.Grey.Lighten2).Padding(3).Text((i + 1).ToString()).FontSize(8);
                     table.Cell().BorderBottom(1).BorderColor(Colors.Grey.Lighten2).Padding(3).Text(item.IpAddress).FontSize(8);
                     table.Cell().BorderBottom(1).BorderColor(Colors.Grey.Lighten2).Padding(3).Text(item.BranchName).FontSize(8);
                     table.Cell().BorderBottom(1).BorderColor(Colors.Grey.Lighten2).Padding(3).Text(item.OpenPortCount.ToString()).FontSize(8);
-                    table.Cell().BorderBottom(1).BorderColor(Colors.Grey.Lighten2).Padding(3).Text(item.RiskScore.ToString()).FontSize(8);
+                    table.Cell().BorderBottom(1).BorderColor(Colors.Grey.Lighten2).Padding(3).Text(displayRisk).FontSize(8);
                 }
             });
         }

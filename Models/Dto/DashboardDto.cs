@@ -87,6 +87,12 @@ namespace portscanner_backend.Models.Dto
         public int? TotalOpenPorts { get; set; } 
     }
 
-
-    
+    public class VulnerableHostDto
+    {
+        public string Ip { get; set; } = string.Empty;
+        public bool HostStatus { get; set; }
+        public string BranchName { get; set; } = string.Empty;
+        public string BranchCidr { get; set; } = string.Empty;
+        public List<PortStatusDto> Ports { get; set; } = new List<PortStatusDto>();
+    }
 }

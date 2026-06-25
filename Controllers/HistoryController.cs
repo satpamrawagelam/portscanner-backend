@@ -118,6 +118,7 @@ namespace portscanner_backend.Controllers
                         summary.TotalHostWithOpenPort   = reader.GetInt32(reader.GetOrdinal("TotalHostWithOpenPort"));
                         summary.HighSeverityPortCount   = reader.GetInt32(reader.GetOrdinal("HighSeverityPortCount"));
                         summary.MediumSeverityPortCount = reader.GetInt32(reader.GetOrdinal("MediumSeverityPortCount"));
+                        summary.TotalRiskScore          = reader.IsDBNull(reader.GetOrdinal("TotalRiskScore")) ? 0 : reader.GetInt32(reader.GetOrdinal("TotalRiskScore"));
                     }
 
                     // ── RS 2: Top Branches ────────────────────────────────────
@@ -131,7 +132,18 @@ namespace portscanner_backend.Controllers
                             RiskScore     = reader.GetInt32(reader.GetOrdinal("RiskScore"))
                         });
 
-                    // ── RS 3: Top Hosts ───────────────────────────────────────
+                    // ── RS 3: Top Branches High Severity ──────────────────────
+                    await reader.NextResultAsync();
+                    var topHighSeverityBranches = new List<TopBranchReportDto>();
+                    while (await reader.ReadAsync())
+                        topHighSeverityBranches.Add(new TopBranchReportDto
+                        {
+                            BranchName    = reader.GetString(reader.GetOrdinal("BranchName")),
+                            OpenPortCount = reader.GetInt32(reader.GetOrdinal("HighPortCount")),
+                            RiskScore     = reader.GetInt32(reader.GetOrdinal("RiskScore"))
+                        });
+
+                    // ── RS 4: Top Hosts ───────────────────────────────────────
                     await reader.NextResultAsync();
                     var topHosts = new List<TopHostReportDto>();
                     while (await reader.ReadAsync())
@@ -143,7 +155,7 @@ namespace portscanner_backend.Controllers
                             RiskScore     = reader.GetInt32(reader.GetOrdinal("RiskScore"))
                         });
 
-                    // ── RS 4: Top Ports ───────────────────────────────────────
+                    // ── RS 5: Top Ports ───────────────────────────────────────
                     await reader.NextResultAsync();
                     var topPorts = new List<TopPortReportDto>();
                     while (await reader.ReadAsync())
@@ -155,7 +167,7 @@ namespace portscanner_backend.Controllers
                             OpenCount  = reader.GetInt32(reader.GetOrdinal("OpenCount"))
                         });
 
-                    // ── RS 5: Detail History ──────────────────────────────────
+                    // ── RS 6: Detail History ──────────────────────────────────
                     await reader.NextResultAsync();
                     var details = new List<ScanHistoryDto>();
                     while (await reader.ReadAsync())
@@ -179,6 +191,7 @@ namespace portscanner_backend.Controllers
                         TopBranches     = topBranches,
                         TopHosts        = topHosts,
                         TopPorts        = topPorts,
+                        TopHighSeverityBranches = topHighSeverityBranches,
                         DetailHistory   = details
                     });
                 }

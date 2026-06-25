@@ -114,5 +114,38 @@ namespace portscanner_backend.Services
                     .ToListAsync();
             });
         }
+
+        public async Task<List<VulnerableHostDto>> GetVulnerableHostsAsync()
+        {
+            var rawData = await _context.BranchDetailRaws
+                .FromSqlRaw("EXEC V2_sp_GetVulnerableHosts")
+                .ToListAsync();
+
+            var result = new List<VulnerableHostDto>();
+            var grouped = rawData.GroupBy(x => x.IpAddress);
+            
+            foreach (var grp in grouped)
+            {
+                var firstRow = grp.First();
+                var hostDto = new VulnerableHostDto
+                {
+                    Ip = grp.Key,
+                    HostStatus = firstRow.HostStatus,
+                    BranchName = firstRow.BranchName,
+                    BranchCidr = firstRow.BranchCidr,
+                    Ports = grp.Select(x => new PortStatusDto
+                    {
+                        Port = x.PortNumber,
+                        Service = x.ServiceName,
+                        Status = x.IsOpen,
+                        IsWhitelisted = x.IsWhitelisted,
+                        Severity = x.Severity
+                    }).OrderByDescending(p => p.Status).ThenBy(p => p.Port).ToList()
+                };
+                result.Add(hostDto);
+            }
+
+            return result.OrderBy(h => h.BranchName).ThenBy(h => h.Ip).ToList();
+        }
     }
 }

@@ -87,6 +87,7 @@ namespace portscanner_backend.Models.Dto
         public int TotalHostWithOpenPort { get; set; }
         public int HighSeverityPortCount { get; set; }
         public int MediumSeverityPortCount { get; set; }
+        public int TotalRiskScore { get; set; }
     }
 
     public class TopBranchReportDto
