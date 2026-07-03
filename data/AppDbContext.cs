@@ -23,6 +23,7 @@ namespace portscanner_backend.Data
         public DbSet<ScanHostResult> ScanHostResults { get; set; }
         public DbSet<ScanPortResult> ScanPortResults { get; set; }
         public DbSet<GeneratedReport> GeneratedReports { get; set; }
+        public DbSet<User> Users { get; set; }
 
         public DbSet<DashboardPortStatusOverviewDto> DashboardOverviews { get; set; }
         public DbSet<DashboardPortStatusOverviewDtoHost> DashboardOverviewsHost { get; set; }
@@ -58,6 +59,7 @@ namespace portscanner_backend.Data
             modelBuilder.Entity<ScanHostResult>().ToTable("V2_ScanHostResults");
             modelBuilder.Entity<ScanPortResult>().ToTable("V2_ScanPortResults");
             modelBuilder.Entity<GeneratedReport>().ToTable("V2_GeneratedReports");
+            modelBuilder.Entity<User>().ToTable("V2_Users");
 
             // Keyless Entities
             modelBuilder.Entity<DashboardPortStatusOverviewDto>().HasNoKey();

@@ -142,11 +142,7 @@ namespace portscanner_backend.Workers
             Dictionary<int, string> portSeverities,
             Models.AppConfig config)
         {
-            // Ambil data detail branch dulu (bisa pakai context luar karena cuma baca)
-            // Atau lebih aman ambil di dalam scope masing-masing jika mau benar-benar terisolasi.
-            // Disini kita ambil list CIDR-nya dulu biar tidak passing DbContext ke Task.
             
-            // Kita butuh CIDR dan ID, jadi kita query dulu sebentar pakai Scope temporary atau context yang dipassing (aman karena await sequential)
             List<Models.Branch> branches;
             using (var scope = _serviceProvider.CreateScope())
             {
